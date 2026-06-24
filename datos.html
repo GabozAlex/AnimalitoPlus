@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estadísticas - AnimalitoPlus</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="main-header">
+    <a href="index.html" class="logo">
+      <i class="fas fa-paw"></i> Animalito<span>Plus</span>
+    </a>
+    <nav class="nav-links">
+      <a href="dashboard.html">Jugar</a>
+      <a href="resultados.html">Resultados</a>
+      <a href="datos.html" class="active">Estadísticas</a>
+      <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+    </nav>
+    <a href="login.html" class="btn btn-gold btn-sm d-md-none"><i class="fas fa-user"></i></a>
+  </header>
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h4><i class="fas fa-chart-bar me-2"></i> Estadísticas</h4>
+  </div>
+
+  <div class="stats-section">
+
+    <!-- CALIENTES -->
+    <div class="stats-card">
+      <h5>
+        <span class="badge-dot" style="background:var(--success);"></span>
+        Top 10 Calientes
+        <small class="text-muted" style="font-weight:400;font-size:12px;">(más frecuentes)</small>
+      </h5>
+      <div id="hotAnimals">
+        <div class="text-muted text-center py-3" style="font-size:13px;">Cargando datos...</div>
+      </div>
+    </div>
+
+    <!-- FRÍOS -->
+    <div class="stats-card">
+      <h5>
+        <span class="badge-dot" style="background:var(--danger);"></span>
+        Top 10 Fríos
+        <small class="text-muted" style="font-weight:400;font-size:12px;">(menos frecuentes)</small>
+      </h5>
+      <div id="coldAnimals">
+        <div class="text-muted text-center py-3" style="font-size:13px;">Cargando datos...</div>
+      </div>
+    </div>
+
+    <!-- ÚLTIMOS 30 DÍAS -->
+    <div class="stats-card">
+      <h5>
+        <i class="fas fa-calendar-alt text-primary me-1"></i>
+        Estadísticas últimos 30 días
+      </h5>
+      <div id="stats30">
+        <div class="text-muted text-center py-3" style="font-size:13px;">Cargando datos...</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
+    <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
+    <a href="datos.html" class="active"><i class="fas fa-chart-bar"></i> Datos</a>
+    <a href="login.html"><i class="fas fa-user"></i> Ingresar</a>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="js/app.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      renderStats();
+    });
+
+    function renderStats() {
+      const allResults = JSON.parse(localStorage.getItem('animalito_results') || '[]');
+      // If no real data, generate mock stats based on ANIMALES
+      const counts = {};
+      ANIMALES.forEach(a => { counts[a.id] = 0; });
+
+      if (allResults.length > 0) {
+        allResults.forEach(r => {
+          if (counts[r.animalId] !== undefined) counts[r.animalId]++;
+        });
+      } else {
+        // Mock data: random counts
+        ANIMALES.forEach(a => {
+          counts[a.id] = Math.floor(Math.random() * 50) + 1;
+        });
+        // Make some colder and some hotter
+        ANIMALES.slice(0, 10).forEach(a => { counts[a.id] = Math.floor(Math.random() * 8) + 1; });
+        ANIMALES.slice(10, 20).forEach(a => { counts[a.id] = Math.floor(Math.random() * 15) + 10; });
+        ANIMALES.slice(20).forEach(a => { counts[a.id] = Math.floor(Math.random() * 30) + 20; });
+      }
+
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+
+      // Hot (top 10)
+      const hot = sorted.slice(0, 10);
+      const maxHot = hot.length > 0 ? hot[0][1] : 1;
+      const hotHtml = hot.map(([id, count]) => {
+        const animal = ANIMALES.find(a => a.id === parseInt(id));
+        if (!animal) return '';
+        const pct = (count / maxHot) * 100;
+        return `
+          <div class="stat-row">
+            <span class="stat-num">${String(animal.id).padStart(2, '0')}</span>
+            <span><i class="fas ${animal.icono} me-1"></i> ${animal.nombre}</span>
+            <div class="stat-bar"><div class="fill hot" style="width:${pct}%"></div></div>
+            <span class="stat-count hot">${count}</span>
+          </div>
+        `;
+      }).join('');
+      document.getElementById('hotAnimals').innerHTML = hotHtml || '<div class="text-muted text-center py-3">Sin datos</div>';
+
+      // Cold (bottom 10)
+      const cold = sorted.slice(-10).reverse();
+      const maxCold = cold.length > 0 ? cold[cold.length - 1][1] : 1;
+      const coldHtml = cold.map(([id, count]) => {
+        const animal = ANIMALES.find(a => a.id === parseInt(id));
+        if (!animal) return '';
+        const pct = (count / maxCold) * 100;
+        return `
+          <div class="stat-row">
+            <span class="stat-num">${String(animal.id).padStart(2, '0')}</span>
+            <span><i class="fas ${animal.icono} me-1"></i> ${animal.nombre}</span>
+            <div class="stat-bar"><div class="fill cold" style="width:${pct}%"></div></div>
+            <span class="stat-count cold">${count}</span>
+          </div>
+        `;
+      }).join('');
+      document.getElementById('coldAnimals').innerHTML = coldHtml || '<div class="text-muted text-center py-3">Sin datos</div>';
+
+      // Stats 30 days
+      const totalSorteos = sorted.reduce((s, [, c]) => s + c, 0);
+      const promedio = (totalSorteos / ANIMALES.length).toFixed(1);
+      const maxAnimal = ANIMALES.find(a => a.id === parseInt(sorted[0][0]));
+      const minAnimal = ANIMALES.find(a => a.id === parseInt(sorted[sorted.length - 1][0]));
+      document.getElementById('stats30').innerHTML = `
+        <div class="stat-row"><span>Total de sorteos</span><span class="stat-count">${totalSorteos}</span></div>
+        <div class="stat-row"><span>Promedio por animal</span><span class="stat-count">${promedio}</span></div>
+        <div class="stat-row"><span>Más caliente</span><span class="stat-count hot"><i class="fas ${maxAnimal.icono} me-1"></i>${maxAnimal.nombre} (${sorted[0][1]})</span></div>
+        <div class="stat-row"><span>Más frío</span><span class="stat-count cold"><i class="fas ${minAnimal.icono} me-1"></i>${minAnimal.nombre} (${sorted[sorted.length - 1][1]})</span></div>
+      `;
+    }
+  </script>
+</body>
+</html>
