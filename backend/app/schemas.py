@@ -8,7 +8,7 @@ import enum
 
 class UsuarioCreate(BaseModel):
     nombre: str
-    apellido: str
+    apellido: Optional[str] = None
     correo: EmailStr
     clave: str
     cedula: Optional[str] = None

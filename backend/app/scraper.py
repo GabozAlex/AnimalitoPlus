@@ -107,7 +107,7 @@ def scrape_lottery(url: str, loteria: str, fecha: str) -> list[dict]:
             logger.warning(f"[{loteria}] Unknown time '{time_text}' on {fecha}")
             continue
         animal_id = ANIMAL_NOMBRE_A_ID.get(animal.upper(), str(numero))
-    records.append({
+        records.append({
             "fecha": fecha,
             "loteria": loteria,
             "numero": animal_id,
