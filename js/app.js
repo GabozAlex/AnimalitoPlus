@@ -40,16 +40,14 @@ function apiFetch(path, options = {}) {
 }
 
 async function updateBalanceDisplay() {
-  const el = document.getElementById('balanceDisplay');
   const navEl = document.getElementById('navBalance');
   try {
     const res = await apiFetch('/api/auth/balance');
     if (res.ok) {
       const data = await res.json();
-      if (el) el.textContent = data.saldo.toFixed(2);
       if (navEl) navEl.textContent = data.saldo.toFixed(2);
     }
-  } catch {}
+  } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
 
 async function renderResults(fecha) {
@@ -78,19 +76,19 @@ async function renderResults(fecha) {
 const ANIMALES = [
   { id: '0',  numero: '0',  nombre: 'DELFIN',   icono: 'fa-fish' },
   { id: '00', numero: '00', nombre: 'BALLENA',  icono: 'fa-fish' },
-  { id: 1,  numero: '01', nombre: 'CARNERO',  icono: 'fa-sheep' },
+  { id: 1,  numero: '01', nombre: 'CARNERO',  icono: 'fa-horse-head' },
   { id: 2,  numero: '02', nombre: 'TORO',     icono: 'fa-cow' },
   { id: 3,  numero: '03', nombre: 'CIEMPIES', icono: 'fa-bug' },
   { id: 4,  numero: '04', nombre: 'ALACRAN',  icono: 'fa-bug' },
   { id: 5,  numero: '05', nombre: 'LEON',     icono: 'fa-paw' },
-  { id: 6,  numero: '06', nombre: 'RANA',     icono: 'fa-frog' },
+  { id: 6,  numero: '06', nombre: 'RANA',     icono: 'fa-dragon' },
   { id: 7,  numero: '07', nombre: 'PERICO',   icono: 'fa-dove' },
-  { id: 8,  numero: '08', nombre: 'RATON',    icono: 'fa-rat' },
+  { id: 8,  numero: '08', nombre: 'RATON',    icono: 'fa-otter' },
   { id: 9,  numero: '09', nombre: 'AGUILA',   icono: 'fa-feather' },
   { id: 10, numero: '10', nombre: 'TIGRE',    icono: 'fa-paw' },
   { id: 11, numero: '11', nombre: 'GATO',     icono: 'fa-cat' },
   { id: 12, numero: '12', nombre: 'CABALLO',  icono: 'fa-horse' },
-  { id: 13, numero: '13', nombre: 'MONO',     icono: 'fa-monkey' },
+  { id: 13, numero: '13', nombre: 'MONO',     icono: 'fa-paw' },
   { id: 14, numero: '14', nombre: 'PALOMA',   icono: 'fa-dove' },
   { id: 15, numero: '15', nombre: 'ZORRO',    icono: 'fa-paw' },
   { id: 16, numero: '16', nombre: 'OSO',      icono: 'fa-paw' },
@@ -106,14 +104,14 @@ const ANIMALES = [
   { id: 26, numero: '26', nombre: 'VACA',     icono: 'fa-cow' },
   { id: 27, numero: '27', nombre: 'PERRO',    icono: 'fa-dog' },
   { id: 28, numero: '28', nombre: 'ZAMURO',   icono: 'fa-feather' },
-  { id: 29, numero: '29', nombre: 'ELEFANTE', icono: 'fa-elephant' },
+  { id: 29, numero: '29', nombre: 'ELEFANTE', icono: 'fa-hippo' },
   { id: 30, numero: '30', nombre: 'CAIMAN',   icono: 'fa-lizard' },
   { id: 31, numero: '31', nombre: 'LAPA',     icono: 'fa-paw' },
   { id: 32, numero: '32', nombre: 'ARDILLA',  icono: 'fa-paw' },
   { id: 33, numero: '33', nombre: 'PESCADO',  icono: 'fa-fish' },
   { id: 34, numero: '34', nombre: 'VENADO',   icono: 'fa-paw' },
   { id: 35, numero: '35', nombre: 'JIRAFA',   icono: 'fa-paw' },
-  { id: 36, numero: '36', nombre: 'CULEBRA',  icono: 'fa-snake' },
+  { id: 36, numero: '36', nombre: 'CULEBRA',  icono: 'fa-worm' },
 ];
 
 async function logout() {

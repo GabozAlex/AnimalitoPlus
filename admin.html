@@ -41,11 +41,11 @@
   <!-- SIDEBAR -->
   <div class="sidebar" id="sidebar">
     <div class="logo"><i class="fas fa-paw"></i> Animalito<span>Plus</span></div>
-    <a href="#" class="active" onclick="showSection('dashboard')"><i class="fas fa-chart-pie"></i> Dashboard</a>
-    <a href="#" onclick="showSection('usuarios')"><i class="fas fa-users"></i> Usuarios</a>
-    <a href="#" onclick="showSection('apuestas')"><i class="fas fa-ticket"></i> Apuestas</a>
-    <a href="#" onclick="showSection('resultados')"><i class="fas fa-list"></i> Resultados</a>
-    <a href="#" onclick="showSection('reportes')"><i class="fas fa-file-invoice"></i> Reportes</a>
+    <a href="#" class="active" onclick="showSection('dashboard', event)"><i class="fas fa-chart-pie"></i> Dashboard</a>
+    <a href="#" onclick="showSection('usuarios', event)"><i class="fas fa-users"></i> Usuarios</a>
+    <a href="#" onclick="showSection('apuestas', event)"><i class="fas fa-ticket"></i> Apuestas</a>
+    <a href="#" onclick="showSection('resultados', event)"><i class="fas fa-list"></i> Resultados</a>
+    <a href="#" onclick="showSection('reportes', event)"><i class="fas fa-file-invoice"></i> Reportes</a>
     <hr style="border-color:rgba(255,255,255,.1);margin:16px 20px;">
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
   </div>
@@ -207,18 +207,13 @@
       document.getElementById('sidebar').classList.toggle('show');
     }
 
-    function showSection(name) {
-      document.querySelectorAll('.section-admin').forEach(s => s.classList.add('d-none'));
-      document.getElementById(`sec-${name}`).classList.remove('d-none');
-      document.getElementById('sectionTitle').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+    function showSection(name, event) {
+      if (event) event.preventDefault();
+      document.querySelectorAll('.section-admin').forEach(s => s.classList.remove('active'));
+      document.getElementById(`sec-${name}`)?.classList.add('active');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
-      event.target.closest('a').classList.add('active');
-      if (window.innerWidth < 768) document.getElementById('sidebar').classList.remove('show');
-      if (name === 'dashboard') cargarDashboard();
-      if (name === 'usuarios') cargarUsuarios();
-      if (name === 'apuestas') cargarApuestasAdmin();
-      if (name === 'resultados') cargarResultadosAdmin();
-      if (name === 'reportes') cargarReportes();
+      if (event) event.target.closest('a').classList.add('active');
+      document.getElementById('sectionTitle').textContent = name.charAt(0).toUpperCase() + name.slice(1);
     }
 
     async function cargarTodo() {

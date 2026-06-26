@@ -6,7 +6,7 @@ const betSlip = {};
 const LOTERIAS = [
   { key: 'lotto_activo', nombre: 'Lotto Activo', icono: 'fa-lion', color: '#0ea5e9' },
   { key: 'la_granjita', nombre: 'La Granjita', icono: 'fa-egg', color: '#22c55e' },
-  { key: 'selvaplus', nombre: 'Selva Plus', icono: 'fa-elephant', color: '#f59e0b' },
+  { key: 'selvaplus', nombre: 'Selva Plus', icono: 'fa-hippo', color: '#f59e0b' },
 ];
 
 const HORARIOS = [
@@ -28,11 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 async function loadUserInfo() {
-  const nameEl = document.getElementById('userName');
-  if (nameEl) {
-    const user = getCurrentUser();
-    if (user) nameEl.textContent = `${user.nombre} ${user.apellido}`.trim() || user.correo;
-  }
   const adminLink = document.getElementById('adminLink');
   if (adminLink) {
     const user = getCurrentUser();
@@ -99,7 +94,7 @@ function renderAnimalGrid() {
   const grid = document.getElementById('animalGrid');
   if (!grid) return;
   grid.innerHTML = ANIMALES.map(a => `
-    <div class="animal-item" data-id="${a.id}" onclick="toggleAnimal(${a.id})">
+    <div class="animal-item" data-id="${a.id}" onclick="toggleAnimal('${a.id}')">
       <i class="fas ${a.icono} animal-icon"></i>
       <div class="animal-number">${String(a.id).padStart(2, '0')}</div>
       <div class="animal-name">${a.nombre}</div>
@@ -117,7 +112,7 @@ function toggleAnimal(id) {
 
 function updateAnimalGridUI() {
   document.querySelectorAll('.animal-item').forEach(el => {
-    const id = parseInt(el.dataset.id);
+    const id = el.dataset.id;
     const isSelected = !!betSlip[id];
     el.classList.toggle('selected', isSelected);
     const badge = document.getElementById(`badge-${id}`);

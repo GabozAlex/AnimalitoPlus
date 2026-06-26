@@ -70,7 +70,7 @@
       const picker = document.getElementById('datePicker');
       if (picker) {
         picker.valueAsDate = new Date();
-        renderResults();
+        await renderResults();
         picker.addEventListener('change', filterResults);
       }
     });

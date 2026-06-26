@@ -340,40 +340,6 @@ ul { list-style: none; padding: 0; margin: 0; }
   .lottery-card .lottery-icon { width: 50px; height: 50px; font-size: 24px; }
   .lottery-card .lottery-name { font-size: 14px; }
 }
-.lottery-card {
-  background: var(--bg-card);
-  border: 2px solid var(--border);
-  border-radius: var(--radius);
-  padding: 16px 8px;
-  text-align: center;
-  cursor: pointer;
-  transition: all .2s;
-}
-.lottery-card:active { transform: scale(.96); }
-.lottery-card.active {
-  border-color: var(--gold);
-  background: rgba(245,158,11,.08);
-}
-.lottery-card .lottery-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 8px;
-  font-size: 22px;
-}
-.lottery-card .lottery-name {
-  font-weight: 700;
-  font-size: 13px;
-}
-@media (min-width: 768px) {
-  .lottery-selector { padding: 16px 0; max-width: 500px; margin: 0 auto; }
-  .lottery-card .lottery-icon { width: 56px; height: 56px; font-size: 26px; }
-  .lottery-card .lottery-name { font-size: 14px; }
-}
-
 /* ===== HOUR GRID ===== */
 .hour-grid-label {
   font-size: 13px;
@@ -421,49 +387,6 @@ ul { list-style: none; padding: 0; margin: 0; }
   border-color: #e2e8f0;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.06);
 }
-.dash-header {
-  background: linear-gradient(135deg, var(--primary-dark), var(--primary));
-  padding: 20px 16px;
-  color: #fff;
-  border-radius: 0 0 24px 24px;
-  margin-bottom: 16px;
-}
-.dash-header .balance {
-  font-size: 32px;
-  font-weight: 800;
-  margin: 4px 0;
-}
-.dash-header .balance small { font-size: 14px; font-weight: 400; opacity: .8; }
-.dash-header .dash-actions { display: flex; gap: 8px; margin-top: 12px; }
-.dash-header .dash-actions .btn {
-  padding: 8px 20px;
-  font-weight: 700;
-  font-size: 13px;
-  border-radius: 50px;
-  border: 2px solid rgba(255,255,255,.3);
-  color: #fff;
-  background: transparent;
-}
-.dash-header .dash-actions .btn:hover { background: rgba(255,255,255,.15); }
-.dash-header .dash-actions .btn-solid { background: var(--gold); border-color: var(--gold); color: var(--text); }
-.dash-header .dash-actions .btn-solid:hover { background: var(--gold-dark); border-color: var(--gold-dark); }
-
-/* Timer */
-.timer-bar {
-  background: var(--bg-card);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  margin: 0 16px 16px;
-  box-shadow: var(--shadow);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.timer-bar .timer-label { font-size: 13px; color: var(--text-muted); }
-.timer-bar .timer-value { font-size: 24px; font-weight: 800; color: var(--primary); }
-.timer-bar .timer-value.warning { color: var(--danger); }
-.timer-bar .timer-value span { font-size: 14px; font-weight: 400; }
-
 /* Bet selector */
 .bet-selector {
   display: flex;
@@ -581,24 +504,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .comanda .btn-play:hover { opacity: .9; }
 .comanda .btn-play:disabled { opacity: .4; cursor: not-allowed; }
 
-/* Last plays */
-.last-plays { padding: 0 16px 16px; }
-.last-plays .play-item {
-  background: var(--bg-card);
-  border-radius: var(--radius-sm);
-  padding: 10px 14px;
-  margin-bottom: 6px;
-  box-shadow: var(--shadow);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-}
-.last-plays .play-item .play-result {
-  font-weight: 700;
-  color: var(--primary);
-}
-
 /* ===== TABLES (resultados/datos) ===== */
 .page-header {
   background: linear-gradient(135deg, var(--primary-dark), var(--primary));
@@ -636,9 +541,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .table-custom .num-cell { font-weight: 800; font-size: 16px; color: var(--primary); }
 
 /* Stats cards */
-.stats-section { padding: 0 16px; }
-.stats-section h5 { font-weight: 700; font-size: 16px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
-.stats-section h5 .badge-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .stats-card {
   background: var(--bg-card);
   border-radius: var(--radius);
@@ -659,21 +561,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .stats-card .stat-row .stat-count { font-weight: 700; }
 .stats-card .stat-row .stat-count.cold { color: var(--danger); }
 .stats-card .stat-row .stat-count.hot { color: var(--success); }
-.stats-card .stat-row .stat-bar {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--border);
-  flex: 1;
-  margin: 0 12px;
-  overflow: hidden;
-}
-.stats-card .stat-row .stat-bar .fill {
-  height: 100%;
-  border-radius: 3px;
-  transition: width .5s;
-}
-.stats-card .stat-row .stat-bar .fill.cold { background: var(--danger); }
-.stats-card .stat-row .stat-bar .fill.hot { background: var(--success); }
 
 /* Date picker */
 .date-picker { padding: 0 16px 16px; display: flex; gap: 8px; }
