@@ -41,12 +41,13 @@ function apiFetch(path, options = {}) {
 
 async function updateBalanceDisplay() {
   const el = document.getElementById('balanceDisplay');
-  if (!el) return;
+  const navEl = document.getElementById('navBalance');
   try {
     const res = await apiFetch('/api/auth/balance');
     if (res.ok) {
       const data = await res.json();
-      el.textContent = data.saldo.toFixed(2);
+      if (el) el.textContent = data.saldo.toFixed(2);
+      if (navEl) navEl.textContent = data.saldo.toFixed(2);
     }
   } catch {}
 }

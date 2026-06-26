@@ -21,34 +21,25 @@
       <a href="datos.html">Estadísticas</a>
       <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
       <a href="admin.html" id="adminLink" class="d-none"><i class="fas fa-cog"></i> Admin</a>
+      <span style="font-weight:700;color:var(--gold);font-size:14px;margin:0 8px;">Bs <span id="navBalance">0.00</span></span>
+      <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus me-1"></i> Recargar</a>
+      <a href="perfil.html"><i class="fas fa-ticket-alt me-1"></i> Tickets</a>
       <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
     <a href="#" onclick="logout()" class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
   </header>
 
-  <!-- DASHBOARD HEADER -->
-  <div class="dash-header">
-    <div class="d-flex justify-content-between align-items-start">
-      <div>
-        <div style="font-size:13px;opacity:.85;"><i class="fas fa-user me-1"></i> <span id="userName"></span></div>
-        <div class="balance">
-          <small>Bs</small> <span id="balanceDisplay">0.00</span>
-        </div>
-      </div>
-    </div>
-    <div class="dash-actions">
-      <button class="btn btn-solid" onclick="showRechargeModal()"><i class="fas fa-plus me-1"></i> Recargar</button>
-      <button class="btn" onclick="showWithdrawModal()"><i class="fas fa-arrow-up me-1"></i> Retirar</button>
+  <!-- USER ACTIONS BAR (mobile) -->
+  <div class="user-actions-bar">
+    <span class="uab-balance"><i class="fas fa-wallet me-1"></i> Bs <span id="balanceDisplay">0.00</span></span>
+    <div class="uab-links">
+      <button class="btn btn-sm uab-btn" onclick="showRechargeModal()"><i class="fas fa-plus"></i> Recargar</button>
+      <a href="perfil.html" class="btn btn-sm uab-btn"><i class="fas fa-ticket-alt"></i> Tickets</a>
     </div>
   </div>
 
-  <!-- TIMER -->
-  <div class="timer-bar">
-    <div>
-      <div class="timer-label"><i class="fas fa-clock me-1"></i> Próximo sorteo</div>
-    </div>
-    <div class="timer-value" id="timerValue">00:00 <span>min</span></div>
-  </div>
+  <!-- LOTTERY SELECTOR -->
+  <div class="lottery-selector" id="lotterySelector"></div>
 
   <!-- BET AMOUNTS -->
   <div class="bet-selector">
@@ -69,6 +60,10 @@
   <!-- ANIMAL GRID -->
   <div class="animal-grid" id="animalGrid"></div>
 
+  <!-- HOUR GRID -->
+  <div class="hour-grid-label"><i class="fas fa-clock me-1"></i> Horarios disponibles</div>
+  <div class="hour-grid" id="hourGrid"></div>
+
   <!-- COMANDA -->
   <div class="comanda">
     <h6>
@@ -87,21 +82,12 @@
     </button>
   </div>
 
-  <!-- LAST PLAYS -->
-  <div class="section" style="padding-top:0;">
-    <h5 style="font-weight:700;font-size:16px;padding:0 16px;margin-bottom:12px;">
-      <i class="fas fa-history me-1 text-primary"></i> Últimas jugadas
-    </h5>
-    <div class="last-plays" id="lastPlays">
-      <div class="text-muted text-center py-3" style="font-size:13px;">Aún no has realizado jugadas</div>
-    </div>
-  </div>
-
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <a href="dashboard.html" class="active"><i class="fas fa-gamepad"></i> Jugar</a>
     <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
     <a href="datos.html"><i class="fas fa-chart-bar"></i> Datos</a>
+    <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus-circle"></i> Recargar</a>
     <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
   </nav>

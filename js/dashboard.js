@@ -1,5 +1,18 @@
 let selectedAmount = 1;
+let selectedLoteria = null;
+let selectedHorario = null;
 const betSlip = {};
+
+const LOTERIAS = [
+  { key: 'lotto_activo', nombre: 'Lotto Activo', icono: 'fa-lion', color: '#0ea5e9' },
+  { key: 'la_granjita', nombre: 'La Granjita', icono: 'fa-egg', color: '#22c55e' },
+  { key: 'selvaplus', nombre: 'Selva Plus', icono: 'fa-elephant', color: '#f59e0b' },
+];
+
+const HORARIOS = [
+  '08:00', '09:00', '10:00', '11:00', '12:00',
+  '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
+];
 
 document.addEventListener('DOMContentLoaded', () => {
   const token = requireAuth();
@@ -8,8 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
   updateBalanceDisplay();
   renderAnimalGrid();
   renderBetSlip();
-  renderLastPlays();
-  startTimer();
+  renderLotterySelector();
+  renderHourGrid();
   setupBetAmounts();
   document.getElementById('btnPlay')?.addEventListener('click', playBets);
 });
@@ -34,6 +47,51 @@ function setupBetAmounts() {
       el.classList.add('active');
       selectedAmount = parseFloat(el.dataset.amt);
     });
+  });
+}
+
+function renderLotterySelector() {
+  const container = document.getElementById('lotterySelector');
+  if (!container) return;
+  container.innerHTML = LOTERIAS.map(l => `
+    <div class="lottery-card ${selectedLoteria === l.key ? 'active' : ''}" data-loteria="${l.key}" onclick="selectLoteria('${l.key}')">
+      <div class="lottery-icon" style="background:${l.color}20;color:${l.color};"><i class="fas ${l.icono}"></i></div>
+      <div class="lottery-name">${l.nombre}</div>
+    </div>
+  `).join('');
+}
+
+function selectLoteria(key) {
+  selectedLoteria = key;
+  document.querySelectorAll('.lottery-card').forEach(el => {
+    el.classList.toggle('active', el.dataset.loteria === key);
+  });
+}
+
+function renderHourGrid() {
+  const container = document.getElementById('hourGrid');
+  if (!container) return;
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+  container.innerHTML = HORARIOS.map(h => {
+    const [hh, mm] = h.split(':').map(Number);
+    const isPast = hh < currentHour || (hh === currentHour && mm <= currentMin);
+    const isActive = selectedHorario === h;
+    return `
+      <div class="hour-item ${isPast ? 'disabled' : ''} ${isActive ? 'active' : ''}"
+           data-horario="${h}"
+           onclick="${isPast ? '' : `selectHorario('${h}')`}">
+        ${h}
+      </div>
+    `;
+  }).join('');
+}
+
+function selectHorario(h) {
+  selectedHorario = h;
+  document.querySelectorAll('.hour-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.horario === h);
   });
 }
 
@@ -112,6 +170,15 @@ async function playBets() {
   const entries = Object.values(betSlip);
   if (entries.length === 0) return;
 
+  if (!selectedLoteria) {
+    Swal.fire('Selecciona una lotería', 'Elige una lotería para continuar', 'warning');
+    return;
+  }
+  if (!selectedHorario) {
+    Swal.fire('Selecciona un horario', 'Elige un horario disponible', 'warning');
+    return;
+  }
+
   const total = entries.reduce((sum, e) => sum + e.monto, 0);
   const res = await apiFetch('/api/auth/balance');
   if (res.ok) {
@@ -122,46 +189,13 @@ async function playBets() {
     }
   }
 
-  const { value: loteria } = await Swal.fire({
-    title: 'Seleccionar lotería',
-    input: 'select',
-    inputOptions: {
-      'lotto_activo': 'Lotto Activo',
-      'la_granjita': 'La Granjita',
-      'selvaplus': 'SelvaPlus',
-    },
-    inputPlaceholder: 'Elige una lotería',
-    showCancelButton: true,
-    confirmButtonText: 'Continuar',
-    confirmButtonColor: '#f59e0b',
-    inputValidator: v => { if (!v) return 'Selecciona una lotería'; },
-  });
-  if (!loteria) return;
-
-  const { value: horario } = await Swal.fire({
-    title: 'Seleccionar horario',
-    input: 'select',
-    inputOptions: {
-      '09:00': '09:00', '10:00': '10:00', '11:00': '11:00',
-      '12:00': '12:00', '13:00': '13:00', '14:00': '14:00',
-      '15:00': '15:00', '16:00': '16:00', '17:00': '17:00',
-      '18:00': '18:00', '19:00': '19:00',
-    },
-    inputPlaceholder: 'Elige horario',
-    showCancelButton: true,
-    confirmButtonText: 'Jugar',
-    confirmButtonColor: '#f59e0b',
-    inputValidator: v => { if (!v) return 'Selecciona un horario'; },
-  });
-  if (!horario) return;
-
   Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
   const r = await apiFetch('/api/apuestas', {
     method: 'POST',
     body: JSON.stringify({
-      loteria,
-      horario,
+      loteria: selectedLoteria,
+      horario: selectedHorario,
       animales: entries.map(e => ({ animal_id: String(e.id), monto: e.monto })),
     }),
   });
@@ -178,87 +212,6 @@ async function playBets() {
   renderBetSlip();
   updateAnimalGridUI();
   await updateBalanceDisplay();
-  renderLastPlays();
 
   Swal.fire({ icon: 'success', title: '¡Jugada registrada!', text: `Total: Bs ${total.toFixed(2)}`, timer: 2000, showConfirmButton: false });
-}
-
-async function renderLastPlays() {
-  const container = document.getElementById('lastPlays');
-  if (!container) return;
-  const token = getToken();
-  if (!token) return;
-
-  const res = await apiFetch('/api/apuestas?limit=5');
-  if (!res.ok) { container.innerHTML = '<div class="text-muted text-center py-3" style="font-size:13px;">Error al cargar jugadas</div>'; return; }
-  const apuestas = await res.json();
-
-  if (apuestas.length === 0) {
-    container.innerHTML = '<div class="text-muted text-center py-3" style="font-size:13px;">Aún no has realizado jugadas</div>';
-    return;
-  }
-
-  container.innerHTML = apuestas.map(p => {
-    const time = new Date(p.created_at).toLocaleTimeString('es-BO', { hour: '2-digit', minute: '2-digit' });
-    const animales = (p.detalles || []).map(d => {
-      const a = ANIMALES.find(an => String(an.id) === d.animal_id);
-      return a ? a.nombre : d.animal_id;
-    }).join(', ');
-    const estadoClass = p.estado === 'ganada' ? 'play-win' : p.estado === 'perdida' ? 'play-lose' : '';
-    return `
-      <div class="play-item ${estadoClass}">
-        <div>
-          <div style="font-weight:600;font-size:12px;">${time} · ${p.loteria}</div>
-          <div style="font-size:12px;color:var(--text-muted);">${animales}</div>
-        </div>
-        <div class="play-result">Bs ${p.total.toFixed(2)}</div>
-      </div>
-    `;
-  }).join('');
-}
-
-let timerInterval = null;
-
-function startTimer() {
-  const el = document.getElementById('timerValue');
-  if (!el) return;
-  function updateTimer() {
-    const now = new Date();
-    const minutes = now.getMinutes();
-    const nextMinute = Math.ceil((minutes + 1) / 5) * 5;
-    const next = new Date(now);
-    next.setMinutes(nextMinute, 0, 0);
-    const diff = next - now;
-    if (diff <= 0) return;
-    const m = Math.floor(diff / 60000);
-    const s = Math.floor((diff % 60000) / 1000);
-    el.innerHTML = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')} <span>min</span>`;
-    el.classList.toggle('warning', m === 0 && s <= 30);
-  }
-  updateTimer();
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(updateTimer, 1000);
-}
-
-async function renderResults(fecha) {
-  const container = document.getElementById('resultsBody');
-  if (!container) return;
-  const params = fecha ? `?fecha=${fecha}` : '';
-  const res = await apiFetch(`/api/resultados${params}`);
-  if (!res.ok) { container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Error al cargar resultados</td></tr>'; return; }
-  const results = await res.json();
-  if (results.length === 0) {
-    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">No hay resultados para esta fecha</td></tr>';
-    return;
-  }
-  container.innerHTML = results.map(r => {
-    const animal = ANIMALES.find(a => String(a.id) === r.animal_id);
-    return `
-      <tr>
-        <td>${r.horario}</td>
-        <td><div class="animal-cell"><i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i> ${animal ? animal.nombre : r.animal_id}</div></td>
-        <td class="num-cell">${r.numero}</td>
-      </tr>
-    `;
-  }).join('');
 }
