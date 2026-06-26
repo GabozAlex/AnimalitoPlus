@@ -29,12 +29,33 @@
     </a>
     <nav class="nav-links">
       <a href="index.html" class="active"><i class="fas fa-home"></i> Inicio</a>
-      <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
-      <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
+      <template x-if="!$store.app.token">
+        <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
+      </template>
+      <template x-if="!$store.app.token">
+        <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
+      </template>
       <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
       <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
+      <template x-if="$store.app.token">
+        <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
+      </template>
+      <template x-if="$store.app.token">
+        <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
+      </template>
+      <template x-if="$store.app.token">
+        <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+      </template>
     </nav>
-    <a href="login.html" class="btn btn-gold btn-sm d-md-none"><i class="fas fa-user"></i></a>
+    <template x-if="$store.app.token">
+      <div class="header-balance"><i class="fas fa-wallet me-1"></i> Bs <span x-text="$store.app.balance.toFixed(2)">0.00</span></div>
+    </template>
+    <template x-if="$store.app.token">
+      <a href="#" onclick="logout()" class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
+    </template>
+    <template x-if="!$store.app.token">
+      <a href="login.html" class="btn btn-gold btn-sm d-md-none"><i class="fas fa-user"></i></a>
+    </template>
   </header>
 
   <!-- HERO -->
@@ -158,9 +179,22 @@
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <a href="index.html" class="active"><i class="fas fa-home"></i> Inicio</a>
-    <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
-    <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
+    <template x-if="$store.app.token">
+      <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
+    </template>
+    <template x-if="!$store.app.token">
+      <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
+    </template>
+    <template x-if="!$store.app.token">
+      <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
+    </template>
     <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
+    <template x-if="$store.app.token">
+      <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
+    </template>
+    <template x-if="$store.app.token">
+      <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+    </template>
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
