@@ -52,6 +52,29 @@ async function updateBalanceDisplay() {
   } catch {}
 }
 
+async function renderResults(fecha) {
+  const container = document.getElementById('resultsBody');
+  if (!container) return;
+  const params = fecha ? `?fecha=${fecha}` : '';
+  const res = await apiFetch(`/api/resultados${params}`);
+  if (!res.ok) { container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Error al cargar resultados</td></tr>'; return; }
+  const results = await res.json();
+  if (results.length === 0) {
+    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">No hay resultados para esta fecha</td></tr>';
+    return;
+  }
+  container.innerHTML = results.map(r => {
+    const animal = ANIMALES.find(a => String(a.id) === r.animal_id);
+    return `
+      <tr>
+        <td>${r.horario}</td>
+        <td><div class="animal-cell"><i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i> ${animal ? animal.nombre : r.animal_id}</div></td>
+        <td class="num-cell">${r.numero}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
 const ANIMALES = [
   { id: '0',  numero: '0',  nombre: 'DELFIN',   icono: 'fa-fish' },
   { id: '00', numero: '00', nombre: 'BALLENA',  icono: 'fa-fish' },
