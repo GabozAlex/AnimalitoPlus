@@ -51,15 +51,6 @@ async function updateBalanceDisplay() {
   } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
 
-document.addEventListener('alpine:init', () => {
-  const user = getCurrentUser();
-  Alpine.store('app', {
-    token: getToken(),
-    user: user,
-    balance: user ? user.saldo : 0,
-  });
-});
-
 async function renderResults(fecha) {
   const container = document.getElementById('resultsBody');
   if (!container) return;
