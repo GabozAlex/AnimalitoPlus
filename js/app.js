@@ -46,7 +46,7 @@ async function updateBalanceDisplay() {
     if (res.ok) {
       const data = await res.json();
       if (navEl) navEl.textContent = data.saldo.toFixed(2);
-      if (window.Alpine) Alpine.store('app').balance = data.saldo;
+      if (window.Alpine && Alpine.store('app')) Alpine.store('app').balance = data.saldo;
     }
   } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
