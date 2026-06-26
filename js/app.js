@@ -233,7 +233,6 @@ async function showRechargeModal() {
   const token = getToken();
   if (!token) return;
 
-  const bancosOpts = BANCOS.map(b => `<option value="${b.codigo}">${b.codigo} - ${b.nombre}</option>`).join('');
   const hoy = new Date().toISOString().split('T')[0];
 
   Swal.fire({
@@ -243,7 +242,7 @@ async function showRechargeModal() {
         <div class="mb-1 fw-bold text-success"><i class="fas fa-university me-1"></i> Depósito a:</div>
         <div class="mb-1"><strong>Banco:</strong> ${CASA.banco} (${CASA.banco_codigo})</div>
         <div class="mb-1"><strong>Titular:</strong> ${CASA.nombre}</div>
-        <div class="mb-1"><strong>Cédula:</strong> ${formatCedula(CASA.cedula)}</div>
+        <div class="mb-1"><strong>Cédula:</strong> ${CASA.cedula}</div>
         <div class="mb-1"><strong>Teléfono:</strong> ${formatPhone(CASA.telefono)}</div>
       </div>
       <div class="mb-2">
@@ -253,13 +252,6 @@ async function showRechargeModal() {
       <div class="mb-2">
         <label class="form-label">Número de referencia <span class="text-danger">*</span></label>
         <input type="text" id="swal-ref" class="form-control" placeholder="Ej: 123456789">
-      </div>
-      <div class="mb-2">
-        <label class="form-label">Tu banco (desde dónde pagaste) <span class="text-danger">*</span></label>
-        <select id="swal-banco" class="form-select">
-          <option value="">Selecciona tu banco</option>
-          ${bancosOpts}
-        </select>
       </div>
       <div class="mb-2">
         <label class="form-label">Tipo de pago <span class="text-danger">*</span></label>
@@ -282,11 +274,9 @@ async function showRechargeModal() {
       if (!monto || monto <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
       const ref = document.getElementById('swal-ref').value.trim();
       if (!ref) { Swal.showValidationMessage('Ingresa el número de referencia'); return false; }
-      const banco = document.getElementById('swal-banco').value;
-      if (!banco) { Swal.showValidationMessage('Selecciona tu banco'); return false; }
       const tipo = document.getElementById('swal-tipo').value;
       const fecha = document.getElementById('swal-fecha').value;
-      return { monto, referencia: ref, banco_origen: banco, movement_type: tipo, fecha };
+      return { monto, referencia: ref, movement_type: tipo, fecha };
     }
   }).then(async res => {
     if (!res.isConfirmed) return;
@@ -296,7 +286,6 @@ async function showRechargeModal() {
         monto: res.value.monto,
         metodo: 'pago_movil',
         referencia: res.value.referencia,
-        banco_origen: res.value.banco_origen,
         movement_type: res.value.movement_type,
         fecha: res.value.fecha,
       }),
