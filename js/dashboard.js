@@ -130,7 +130,7 @@ function renderBetSlip() {
   }
   let total = 0;
   container.innerHTML = entries.map(e => {
-    const animal = ANIMALES.find(a => a.id === e.id);
+    const animal = ANIMALES.find(a => String(a.id) === String(e.id));
     total += e.monto;
     return `
       <div class="comanda-item">
