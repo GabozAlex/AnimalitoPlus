@@ -23,8 +23,13 @@
       <template x-if="$store.app.token">
         <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
       </template>
+      <template x-if="$store.app.token">
+        <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
+      </template>
+      <template x-if="$store.app.token">
+        <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+      </template>
       <template x-if="!$store.app.token">
-        <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
         <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
       </template>
     </nav>

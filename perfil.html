@@ -58,7 +58,8 @@
   <nav class="bottom-nav">
     <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
     <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
-    <a href="datos.html"><i class="fas fa-chart-bar"></i> Datos</a>
+    <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
+    <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus-circle"></i> Recargar</a>
     <a href="perfil.html" class="active"><i class="fas fa-user"></i> Perfil</a>
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
   </nav>
@@ -71,6 +72,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       const token = requireAuth();
       if (!token) return;
+      await updateBalanceDisplay();
       await cargarPerfil();
     });
 
