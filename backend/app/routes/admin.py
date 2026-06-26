@@ -235,7 +235,7 @@ def trigger_scraper(
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from app.scraper import run_scraper_save
+    from app.scraper import run_scraper_parallel
 
-    results = run_scraper_save(fecha, db)
+    results = run_scraper_parallel(fecha, db)
     return results

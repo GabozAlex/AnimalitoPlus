@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime
 from typing import Optional
 
@@ -170,6 +171,41 @@ def run_scraper_save(fecha: Optional[str] = None, db: Optional[Session] = None) 
         results = {"fecha": fecha, "total": 0, "loterias": {}}
         for loteria, info in LOTTERIES.items():
             records = scrape_lottery(info["url"], loteria, fecha)
+            saved = save_results(db, records)
+            total_saved += saved
+            results["loterias"][loteria] = {"scraped": len(records), "saved": saved}
+        results["total"] = total_saved
+        return results
+    finally:
+        if close_db:
+            db.close()
+
+
+def scrape_one(loteria: str, info: dict, fecha: str) -> tuple:
+    records = scrape_lottery(info["url"], loteria, fecha)
+    return (loteria, records)
+
+
+def run_scraper_parallel(fecha: Optional[str] = None, db: Optional[Session] = None) -> dict:
+    if fecha is None:
+        fecha = date.today().isoformat()
+    close_db = db is None
+    if db is None:
+        db = SessionLocal()
+    try:
+        scraped_per_loteria = {}
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {
+                executor.submit(scrape_one, loteria, info, fecha): loteria
+                for loteria, info in LOTTERIES.items()
+            }
+            for future in as_completed(futures):
+                loteria, records = future.result()
+                scraped_per_loteria[loteria] = records
+
+        total_saved = 0
+        results = {"fecha": fecha, "total": 0, "loterias": {}}
+        for loteria, records in scraped_per_loteria.items():
             saved = save_results(db, records)
             total_saved += saved
             results["loterias"][loteria] = {"scraped": len(records), "saved": saved}

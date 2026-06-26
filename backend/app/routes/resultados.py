@@ -5,13 +5,13 @@ from typing import Optional
 
 from app.database import get_db
 from app.models import Resultado, Usuario
-from app.schemas import ResultadoOut, ResultadoCreate
+from app.schemas import ResultadoOut, ResultadoCreate, ResultadosResponse
 from app.auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/api/resultados", tags=["resultados"])
 
 
-@router.get("", response_model=list[ResultadoOut])
+@router.get("", response_model=ResultadosResponse)
 def listar_resultados(
     loteria: Optional[str] = None,
     fecha: Optional[str] = None,
@@ -26,13 +26,19 @@ def listar_resultados(
 
     results = query.order_by(Resultado.horario).all()
 
+    source = "db"
     if not results:
-        from app.scraper import run_scraper_save
+        from app.scraper import run_scraper_parallel
         fecha_str = target_date.isoformat()
-        run_scraper_save(fecha_str, db)
+        run_scraper_parallel(fecha_str, db)
         results = query.order_by(Resultado.horario).all()
+        source = "scraped"
 
-    return results
+    return ResultadosResponse(
+        source=source,
+        count=len(results),
+        resultados=results,
+    )
 
 
 @router.post("", response_model=ResultadoOut)

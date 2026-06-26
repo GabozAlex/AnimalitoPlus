@@ -10,10 +10,10 @@ import os
 
 sys.path.insert(0, os.path.dirname(__file__))
 
-from app.scraper import run_scraper_save
+from app.scraper import run_scraper_parallel
 
 fecha = sys.argv[1] if len(sys.argv) > 1 else None
-results = run_scraper_save(fecha)
+results = run_scraper_parallel(fecha)
 print(f"Fecha: {results['fecha']}")
 print(f"Total guardados: {results['total']}")
 for loteria, info in results["loterias"].items():

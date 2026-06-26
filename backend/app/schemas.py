@@ -154,6 +154,12 @@ class AdminUsuarioUpdate(BaseModel):
     bloqueado: Optional[bool] = None
 
 
+class ResultadosResponse(BaseModel):
+    source: str  # "db" | "scraped"
+    count: int
+    resultados: List[ResultadoOut]
+
+
 class ReporteOut(BaseModel):
     fecha: str
     monto_jugado: float

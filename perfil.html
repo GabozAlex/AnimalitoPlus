@@ -51,18 +51,7 @@
       </div>
     </div>
 
-    <!-- MIS TICKETS -->
-    <div class="stats-card">
-      <h5><i class="fas fa-ticket-alt me-1 text-success"></i> Mis Tickets</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-custom" style="font-size:12px;">
-          <thead><tr><th>Fecha</th><th>Lotería</th><th>Animales</th><th>Monto</th><th>Estado</th></tr></thead>
-          <tbody id="ticketsBody">
-            <tr><td colspan="5" class="text-center text-muted py-3">Cargando...</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+
   </div>
 
   <!-- BOTTOM NAV -->
@@ -82,7 +71,6 @@
       const token = requireAuth();
       if (!token) return;
       await cargarPerfil();
-      await cargarTickets();
       const user = getCurrentUser();
       const al = document.getElementById('adminLink');
       if (al && user && user.rol === 'admin') al.classList.remove('d-none');
@@ -141,30 +129,7 @@
       }
     }
 
-    async function cargarTickets() {
-      const res = await apiFetch('/api/apuestas?limit=50');
-      if (!res.ok) { document.getElementById('ticketsBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar</td></tr>'; return; }
-      const apuestas = await res.json();
-      if (apuestas.length === 0) {
-        document.getElementById('ticketsBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin tickets aún</td></tr>';
-        return;
-      }
-      const badges = { ganada: 'bg-success', perdida: 'bg-danger', pendiente: 'bg-warning text-dark', pagada: 'bg-info' };
-      document.getElementById('ticketsBody').innerHTML = apuestas.map(a => {
-        const animales = (a.detalles || []).map(d => {
-          const an = ANIMALES.find(x => String(x.id) === d.animal_id);
-          return an ? an.nombre : d.animal_id;
-        }).join(', ');
-        const badge = badges[a.estado] || 'bg-secondary';
-        return `<tr>
-          <td>${a.fecha}</td>
-          <td>${a.loteria}</td>
-          <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${animales}">${animales}</td>
-          <td>Bs ${a.total.toFixed(2)}</td>
-          <td><span class="badge ${badge}">${a.estado}</span></td>
-        </tr>`;
-      }).join('');
-    }
+
   </script>
 </body>
 </html>

@@ -209,11 +209,17 @@
 
     function showSection(name, event) {
       if (event) event.preventDefault();
-      document.querySelectorAll('.section-admin').forEach(s => s.classList.remove('active'));
-      document.getElementById(`sec-${name}`)?.classList.add('active');
+      document.querySelectorAll('.section-admin').forEach(s => s.classList.add('d-none'));
+      const target = document.getElementById(`sec-${name}`);
+      if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      document.getElementById('sectionTitle').textContent = name.charAt(0).toUpperCase() + name.slice(1);
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', reportes: 'Reportes' };
+      document.getElementById('sectionTitle').textContent = titles[name] || name;
+      if (name === 'usuarios') cargarUsuarios();
+      if (name === 'apuestas') cargarApuestasAdmin();
+      if (name === 'resultados') cargarResultadosAdmin();
+      if (name === 'reportes') cargarReportes();
     }
 
     async function cargarTodo() {
@@ -356,7 +362,8 @@
     async function cargarResultadosAdmin() {
       try {
         const res = await fetch(`${API}/api/resultados`, { headers: getHeaders() });
-        const resultados = await res.json();
+        const data = await res.json();
+        const resultados = data.resultados || data;
         const tbody = document.getElementById('resultadosTable');
         tbody.innerHTML = resultados.map(r => {
           const animal = ANIMALES.find(a => a.id == r.animal_id);

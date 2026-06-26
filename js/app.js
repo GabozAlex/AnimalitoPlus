@@ -54,23 +54,36 @@ async function renderResults(fecha) {
   const container = document.getElementById('resultsBody');
   if (!container) return;
   const params = fecha ? `?fecha=${fecha}` : '';
+
+  container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">🔍 Consultando resultados...</td></tr>';
+
+  let slowTimer = setTimeout(() => {
+    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">⏳ Obteniendo datos de las loterías...</td></tr>';
+  }, 3000);
+
   const res = await apiFetch(`/api/resultados${params}`);
-  if (!res.ok) { container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">Error al cargar resultados</td></tr>'; return; }
-  const results = await res.json();
-  if (results.length === 0) {
-    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">No hay resultados para esta fecha</td></tr>';
+  clearTimeout(slowTimer);
+
+  if (!res.ok) {
+    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">⚠️ Error al conectar con los sitios</td></tr>';
     return;
   }
-  container.innerHTML = results.map(r => {
-    const animal = ANIMALES.find(a => String(a.id) === r.animal_id);
-    return `
+  const data = await res.json();
+  if (data.count === 0) {
+    container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">❌ No hay resultados disponibles hoy</td></tr>';
+    return;
+  }
+  container.innerHTML = '<tr><td colspan="3" class="text-center text-success py-2"><small>✅ Resultados actualizados</small></td></tr>' +
+    data.resultados.map(r => {
+      const animal = ANIMALES.find(a => String(a.id) === r.animal_id);
+      return `
       <tr>
         <td>${r.horario}</td>
         <td><div class="animal-cell"><i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i> ${animal ? animal.nombre : r.animal_id}</div></td>
         <td class="num-cell">${r.numero}</td>
       </tr>
     `;
-  }).join('');
+    }).join('');
 }
 
 const ANIMALES = [
