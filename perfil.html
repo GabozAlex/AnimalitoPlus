@@ -53,6 +53,14 @@
       </div>
     </div>
 
+    <!-- MIS RECARGAS -->
+    <div class="stats-card mb-3">
+      <h5><i class="fas fa-history me-1 text-success"></i> Mis Recargas</h5>
+      <div id="recargasList">
+        <div class="text-muted text-center py-3">Cargando...</div>
+      </div>
+    </div>
+
 
   </div>
 
@@ -83,7 +91,15 @@
       if (!token) return;
       await updateBalanceDisplay();
       await cargarPerfil();
+      await cargarRecargas();
     });
+
+    const ESTADOS_RECARGA = {
+      pendiente: '<span class="badge bg-warning text-dark">🟡 Pendiente</span>',
+      en_proceso: '<span class="badge bg-info text-white">🔵 En Proceso</span>',
+      completado: '<span class="badge bg-success">🟢 Listo</span>',
+      cancelado: '<span class="badge bg-danger">🔴 Cancelado</span>',
+    };
 
     async function cargarPerfil() {
       const res = await apiFetch('/api/auth/perfil');
@@ -92,28 +108,42 @@
       localStorage.setItem(USER_KEY, JSON.stringify(u));
       if (window.Alpine) { Alpine.store('app').balance = u.saldo; Alpine.store('app').user = u; }
 
+      const cedDisplay = formatCedula(u.cedula);
+      const telDisplay = formatPhone(u.telefono);
+      const bancoObj = BANCOS.find(b => b.codigo === u.banco_codigo);
+      const bancoDisplay = bancoObj ? `${bancoObj.codigo} - ${bancoObj.nombre}` : (u.banco || '—');
       document.getElementById('misDatos').innerHTML = `
         <div class="stat-row"><span>Nombre</span><span class="stat-count">${u.nombre} ${u.apellido}</span></div>
         <div class="stat-row"><span>Correo</span><span class="stat-count">${u.correo}</span></div>
-        <div class="stat-row"><span>Teléfono</span><span class="stat-count">${u.telefono || '—'}</span></div>
+        <div class="stat-row"><span>Teléfono</span><span class="stat-count">${telDisplay || '—'}</span></div>
+        <div class="stat-row"><span>Cédula</span><span class="stat-count">${cedDisplay || '—'}</span></div>
+        <div class="stat-row"><span>Banco</span><span class="stat-count">${bancoDisplay}</span></div>
         <div class="stat-row"><span>Saldo</span><span class="stat-count text-gold fw-bold">Bs ${u.saldo.toFixed(2)}</span></div>
       `;
 
+      const bancosOpts = BANCOS.map(b =>
+        `<option value="${b.codigo}" ${u.banco_codigo === b.codigo ? 'selected' : ''}>${b.codigo} - ${b.nombre}</option>`
+      ).join('');
       document.getElementById('datosBancarios').innerHTML = `
         <div class="mb-2">
-          <label class="form-label" style="font-size:13px;">Cédula</label>
-          <input type="text" class="form-control form-control-sm" id="banCedula" value="${u.cedula || ''}" placeholder="Ej: V-12345678">
+          <label class="form-label" style="font-size:13px;">Cédula <span class="text-danger">*</span></label>
+          <input type="text" class="form-control form-control-sm" id="banCedula" value="${u.cedula ? formatCedula(u.cedula) : ''}" placeholder="Ej: V-12345678">
+          <div class="error-msg" id="banCedulaError"></div>
         </div>
         <div class="mb-2">
-          <label class="form-label" style="font-size:13px;">Banco</label>
-          <input type="text" class="form-control form-control-sm" id="banBanco" value="${u.banco || ''}" placeholder="Ej: Banco Mercantil">
+          <label class="form-label" style="font-size:13px;">Banco <span class="text-danger">*</span></label>
+          <select class="form-select form-select-sm" id="banBanco">
+            <option value="">Selecciona tu banco</option>
+            ${bancosOpts}
+          </select>
         </div>
         <div class="mb-2">
-          <label class="form-label" style="font-size:13px;">Teléfono Pago Móvil</label>
-          <input type="text" class="form-control form-control-sm" id="banTelefono" value="${u.telefono || ''}" placeholder="Ej: 04121234567">
+          <label class="form-label" style="font-size:13px;">Teléfono Pago Móvil <span class="text-danger">*</span></label>
+          <input type="tel" class="form-control form-control-sm" id="banTelefono" value="${u.telefono ? formatPhone(u.telefono) : ''}" placeholder="Ej: 0412-1234567">
+          <div class="error-msg" id="banTelefonoError"></div>
         </div>
         <div class="mb-2">
-          <label class="form-label" style="font-size:13px;">Titular</label>
+          <label class="form-label" style="font-size:13px;">Titular <span class="text-danger">*</span></label>
           <input type="text" class="form-control form-control-sm" id="banTitular" value="${u.pago_movil_titular || ''}" placeholder="Nombre del titular">
         </div>
         <button class="btn btn-primary btn-sm mt-2" onclick="guardarDatosBancarios()"><i class="fas fa-save me-1"></i> Guardar</button>
@@ -121,11 +151,51 @@
     }
 
     async function guardarDatosBancarios() {
+      document.querySelectorAll('#datosBancarios .error-msg').forEach(el => el.classList.remove('show'));
+      document.querySelectorAll('#datosBancarios .is-invalid').forEach(el => el.classList.remove('is-invalid'));
+
+      const rawCedula = document.getElementById('banCedula').value.trim();
+      const rawTelefono = document.getElementById('banTelefono').value.trim();
+      const bancoCodigo = document.getElementById('banBanco').value;
+      const titular = document.getElementById('banTitular').value.trim();
+
+      let valid = true;
+
+      const cv = validarCedulaVE(rawCedula);
+      if (!cv.valido) {
+        document.getElementById('banCedula').classList.add('is-invalid');
+        document.getElementById('banCedulaError').textContent = cv.msg;
+        document.getElementById('banCedulaError').classList.add('show');
+        valid = false;
+      }
+
+      const tv = validarTelefonoVE(rawTelefono);
+      if (!tv.valido) {
+        document.getElementById('banTelefono').classList.add('is-invalid');
+        document.getElementById('banTelefonoError').textContent = tv.msg;
+        document.getElementById('banTelefonoError').classList.add('show');
+        valid = false;
+      }
+
+      if (!bancoCodigo) {
+        document.getElementById('banBanco').classList.add('is-invalid');
+        valid = false;
+      }
+
+      if (!titular) {
+        document.getElementById('banTitular').classList.add('is-invalid');
+        valid = false;
+      }
+
+      if (!valid) return;
+
+      const bancoObj = BANCOS.find(b => b.codigo === bancoCodigo);
       const body = {
-        cedula: document.getElementById('banCedula').value.trim(),
-        banco: document.getElementById('banBanco').value.trim(),
-        telefono: document.getElementById('banTelefono').value.trim(),
-        pago_movil_titular: document.getElementById('banTitular').value.trim(),
+        cedula: cv.cedula,
+        telefono: tv.num,
+        banco_codigo: bancoCodigo,
+        banco: bancoObj ? bancoObj.nombre : '',
+        pago_movil_titular: titular,
       };
       const res = await apiFetch('/api/auth/perfil', {
         method: 'PUT',
@@ -135,8 +205,35 @@
         Swal.fire('Guardado', 'Datos bancarios actualizados', 'success');
         cargarPerfil();
       } else {
-        Swal.fire('Error', 'No se pudieron guardar los datos', 'error');
+        const err = await res.json();
+        Swal.fire('Error', err.detail || 'No se pudieron guardar los datos', 'error');
       }
+    }
+
+    async function cargarRecargas() {
+      const container = document.getElementById('recargasList');
+      const res = await apiFetch('/api/pagos/historial?tipo=recarga&limit=20');
+      if (!res.ok) {
+        container.innerHTML = '<div class="text-center text-muted py-3">Error al cargar recargas</div>';
+        return;
+      }
+      const items = await res.json();
+      if (items.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-3">No has realizado recargas aún</div>';
+        return;
+      }
+      container.innerHTML = items.map(r => {
+        let extra = {};
+        try { extra = JSON.parse(r.descripcion || '{}'); } catch(e) {}
+        const banco = extra.banco_origen ? (BANCOS.find(b => b.codigo === extra.banco_origen)?.nombre || extra.banco_origen) : '—';
+        const tipo = extra.movement_type === 'MOVIL_PAY' ? 'Pago Móvil' : extra.movement_type === 'TRANSFER' ? 'Transferencia' : '—';
+        const fecha = extra.fecha_pago || r.created_at.slice(0, 10);
+        const badge = ESTADOS_RECARGA[r.estado] || r.estado;
+        return `<div class="stat-row">
+          <span><small class="text-muted">${fecha}</small><br><small>${banco} · ${tipo}</small></span>
+          <span class="text-end"><strong class="text-gold">Bs ${r.monto.toFixed(2)}</strong><br>${badge}</span>
+        </div>`;
+      }).join('');
     }
 
 

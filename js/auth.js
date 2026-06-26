@@ -15,11 +15,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (correo.length < 3 || !correo.includes('@')) { showError('regUsuario', 'Correo inválido'); valid = false; }
       if (pass.length < 6) { showError('regPass', 'Mínimo 6 caracteres'); valid = false; }
       if (pass !== pass2) { showError('regPass2', 'No coinciden'); valid = false; }
-      if (telefono.length < 7) { showError('regTelefono', 'Teléfono inválido'); valid = false; }
+      const v = validarTelefonoVE(telefono);
+      if (!v.valido) { showError('regTelefono', v.msg); valid = false; }
       if (!valid) return;
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ nombre, apellido: '', correo, clave: pass, telefono }),
+        body: JSON.stringify({ nombre, apellido: '', correo, clave: pass, telefono: normalizePhone(telefono) }),
       });
       if (!res.ok) {
         const err = await res.json();

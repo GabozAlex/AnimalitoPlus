@@ -23,6 +23,7 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
         cedula=data.cedula,
         telefono=data.telefono,
         banco=data.banco,
+        banco_codigo=data.banco_codigo,
         pago_movil_titular=data.pago_movil_titular,
     )
     db.add(usuario)

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     cedula VARCHAR(20),
     telefono VARCHAR(20),
     banco VARCHAR(100),
+    banco_codigo VARCHAR(10),
     pago_movil_titular VARCHAR(100),
     rol VARCHAR(10) DEFAULT 'user' CHECK (rol IN ('user', 'admin')),
     bloqueado BOOLEAN DEFAULT FALSE,
@@ -63,11 +64,12 @@ CREATE INDEX idx_resultados_loteria ON resultados(loteria);
 -- 5. TRANSACCIONES (auditoría)
 CREATE TABLE IF NOT EXISTS transacciones (
     id BIGSERIAL PRIMARY KEY,
-    usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('recarga', 'retiro', 'apuesta', 'pago_premio', 'ajuste_admin')),
+    usuario_id BIGINT REFERENCES usuarios(id) NOT NULL,
+    tipo VARCHAR(20) NOT NULL,  -- recarga, retiro, apuesta, pago_premio, ajuste_admin
     monto DECIMAL(12,2) NOT NULL,
-    metodo VARCHAR(30),
+    metodo VARCHAR(20),        -- pago_movil, cripto, manual
     referencia VARCHAR(255),
+    estado VARCHAR(20) DEFAULT 'pendiente',
     descripcion TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

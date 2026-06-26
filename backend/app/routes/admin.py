@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta, datetime
+import json
 
 from app.database import get_db
 from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado
-from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate
+from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, TransaccionOut, AdminPagoUpdate
 from app.auth import require_admin, get_current_user
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -239,3 +240,73 @@ def trigger_scraper(
 
     results = run_scraper_parallel(fecha, db)
     return results
+
+
+# ===== PAGOS / RECARGAS / RETIROS =====
+
+@router.get("/pagos", response_model=list[TransaccionOut])
+def listar_pagos(
+    tipo: Optional[str] = None,
+    estado: Optional[str] = None,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    query = db.query(Transaccion)
+    if tipo:
+        query = query.filter(Transaccion.tipo == tipo)
+    if estado:
+        query = query.filter(Transaccion.estado == estado)
+    pagos = query.order_by(Transaccion.created_at.desc()).limit(100).all()
+
+    result = []
+    for p in pagos:
+        u = db.query(Usuario).filter(Usuario.id == p.usuario_id).first()
+        result.append({
+            "id": p.id,
+            "usuario_id": p.usuario_id,
+            "tipo": p.tipo,
+            "monto": p.monto,
+            "metodo": p.metodo,
+            "referencia": p.referencia,
+            "estado": p.estado,
+            "descripcion": p.descripcion,
+            "created_at": p.created_at,
+            "usuario_nombre": f"{u.nombre} {u.apellido}" if u else None,
+            "usuario_cedula": u.cedula if u else None,
+            "usuario_telefono": u.telefono if u else None,
+            "usuario_banco": u.banco if u else None,
+            "usuario_banco_codigo": u.banco_codigo if u else None,
+            "usuario_titular": u.pago_movil_titular if u else None,
+        })
+    return result
+
+
+@router.post("/pagos/{pago_id}/estado")
+def cambiar_estado_pago(
+    pago_id: int,
+    data: AdminPagoUpdate,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    pago = db.query(Transaccion).filter(Transaccion.id == pago_id).first()
+    if not pago:
+        raise HTTPException(status_code=404, detail="Pago no encontrado")
+    if pago.estado == "completado":
+        raise HTTPException(status_code=400, detail="El pago ya fue completado")
+
+    if data.estado == "completado":
+        user = db.query(Usuario).filter(Usuario.id == pago.usuario_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        if pago.tipo == "recarga":
+            user.saldo += pago.monto
+        elif pago.tipo == "retiro":
+            if pago.monto > user.saldo:
+                raise HTTPException(status_code=400, detail="Saldo insuficiente")
+            user.saldo -= pago.monto
+        else:
+            raise HTTPException(status_code=400, detail="Tipo de pago no soportado")
+
+    pago.estado = data.estado
+    db.commit()
+    return {"mensaje": f"Pago marcado como {data.estado}", "tipo": pago.tipo, "monto": pago.monto}

@@ -46,6 +46,8 @@
     <a href="#" onclick="showSection('usuarios', event)"><i class="fas fa-users"></i> Usuarios</a>
     <a href="#" onclick="showSection('apuestas', event)"><i class="fas fa-ticket"></i> Apuestas</a>
     <a href="#" onclick="showSection('resultados', event)"><i class="fas fa-list"></i> Resultados</a>
+    <a href="#" onclick="showSection('recargas', event)"><i class="fas fa-plus-circle"></i> Recargas</a>
+    <a href="#" onclick="showSection('retiros', event)"><i class="fas fa-money-bill-wave"></i> Retiros</a>
     <a href="#" onclick="showSection('reportes', event)"><i class="fas fa-file-invoice"></i> Reportes</a>
     <hr style="border-color:rgba(255,255,255,.1);margin:16px 20px;">
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
@@ -163,6 +165,50 @@
       </div>
     </div>
 
+    <!-- SECTION: RECARGAS -->
+    <div id="sec-recargas" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-plus-circle me-1 text-success"></i> Recargas</h5>
+      <div class="mb-2">
+        <select class="form-select form-select-sm w-auto d-inline-block" id="filtroRecargas" onchange="cargarRecargas()">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="en_proceso">En Proceso</option>
+          <option value="completado">Completados</option>
+          <option value="cancelado">Cancelados</option>
+        </select>
+      </div>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0">
+            <thead><tr><th>ID</th><th>Usuario</th><th>Banco</th><th>Teléfono</th><th>Cédula</th><th>Monto</th><th>Referencia</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr></thead>
+            <tbody id="recargasTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: RETIROS -->
+    <div id="sec-retiros" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-money-bill-wave me-1 text-warning"></i> Retiros</h5>
+      <div class="mb-2">
+        <select class="form-select form-select-sm w-auto d-inline-block" id="filtroRetiros" onchange="cargarRetiros()">
+          <option value="">Todos</option>
+          <option value="pendiente">Pendientes</option>
+          <option value="en_proceso">En Proceso</option>
+          <option value="completado">Completados</option>
+          <option value="cancelado">Cancelados</option>
+        </select>
+      </div>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0">
+            <thead><tr><th>ID</th><th>Usuario</th><th>Banco</th><th>Teléfono</th><th>Cédula</th><th>Titular</th><th>Monto</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr></thead>
+            <tbody id="retirosTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- SECTION: REPORTES -->
     <div id="sec-reportes" class="section-admin d-none">
       <h5 class="fw-bold mb-3"><i class="fas fa-file-invoice me-1 text-primary"></i> Reportes</h5>
@@ -215,11 +261,13 @@
       if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', reportes: 'Reportes' };
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes' };
       document.getElementById('sectionTitle').textContent = titles[name] || name;
       if (name === 'usuarios') cargarUsuarios();
       if (name === 'apuestas') cargarApuestasAdmin();
       if (name === 'resultados') cargarResultadosAdmin();
+      if (name === 'recargas') cargarRecargas();
+      if (name === 'retiros') cargarRetiros();
       if (name === 'reportes') cargarReportes();
     }
 
@@ -391,6 +439,105 @@
             </tbody>
           </table>
         `;
+      } catch(e) { console.error(e); }
+    }
+
+    const ESTADO_BADGE = {
+      pendiente: '<span class="badge bg-warning text-dark">Pendiente</span>',
+      en_proceso: '<span class="badge bg-info text-white">En Proceso</span>',
+      completado: '<span class="badge bg-success">Completado</span>',
+      cancelado: '<span class="badge bg-danger">Cancelado</span>',
+    };
+
+    function accionPago(p) {
+      if (p.estado === 'completado' || p.estado === 'cancelado') return '—';
+      return `
+        <button class="btn btn-sm btn-success mb-1" onclick="cambiarEstadoPago(${p.id},'completado')" title="Confirmar"><i class="fas fa-check"></i></button>
+        <button class="btn btn-sm btn-info mb-1" onclick="cambiarEstadoPago(${p.id},'en_proceso')" title="En Proceso"><i class="fas fa-spinner"></i></button>
+        <button class="btn btn-sm btn-danger mb-1" onclick="cambiarEstadoPago(${p.id},'cancelado')" title="Cancelar"><i class="fas fa-times"></i></button>
+      `;
+    }
+
+    async function cargarRecargas() {
+      try {
+        const estado = document.getElementById('filtroRecargas').value;
+        const url = `${API}/api/admin/pagos?tipo=recarga${estado ? '&estado=' + estado : ''}`;
+        const res = await fetch(url, { headers: getHeaders() });
+        const pagos = await res.json();
+        const tbody = document.getElementById('recargasTable');
+        if (pagos.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">Sin recargas</td></tr>';
+          return;
+        }
+        tbody.innerHTML = pagos.map(p => `
+          <tr>
+            <td>${p.id}</td>
+            <td>${p.usuario_nombre || 'N/A'}</td>
+            <td>${p.usuario_banco_codigo ? p.usuario_banco_codigo + ' - ' : ''}${p.usuario_banco || ''}</td>
+            <td>${p.usuario_telefono ? formatPhone(p.usuario_telefono) : ''}</td>
+            <td>${p.usuario_cedula ? formatCedula(p.usuario_cedula) : ''}</td>
+            <td class="fw-bold text-success">Bs ${p.monto.toFixed(2)}</td>
+            <td><code>${p.referencia || '—'}</code></td>
+            <td>${new Date(p.created_at).toLocaleString()}</td>
+            <td>${ESTADO_BADGE[p.estado] || p.estado}</td>
+            <td>${accionPago(p)}</td>
+          </tr>
+        `).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function cargarRetiros() {
+      try {
+        const estado = document.getElementById('filtroRetiros').value;
+        const url = `${API}/api/admin/pagos?tipo=retiro${estado ? '&estado=' + estado : ''}`;
+        const res = await fetch(url, { headers: getHeaders() });
+        const pagos = await res.json();
+        const tbody = document.getElementById('retirosTable');
+        if (pagos.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-3">Sin retiros</td></tr>';
+          return;
+        }
+        tbody.innerHTML = pagos.map(p => `
+          <tr>
+            <td>${p.id}</td>
+            <td>${p.usuario_nombre || 'N/A'}</td>
+            <td>${p.usuario_banco_codigo ? p.usuario_banco_codigo + ' - ' : ''}${p.usuario_banco || ''}</td>
+            <td>${p.usuario_telefono ? formatPhone(p.usuario_telefono) : ''}</td>
+            <td>${p.usuario_cedula ? formatCedula(p.usuario_cedula) : ''}</td>
+            <td>${p.usuario_titular || ''}</td>
+            <td class="fw-bold text-warning">Bs ${p.monto.toFixed(2)}</td>
+            <td>${new Date(p.created_at).toLocaleString()}</td>
+            <td>${ESTADO_BADGE[p.estado] || p.estado}</td>
+            <td>${accionPago(p)}</td>
+          </tr>
+        `).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function cambiarEstadoPago(id, estado) {
+      const labels = { completado: 'Confirmar', en_proceso: 'Marcar En Proceso', cancelado: 'Cancelar' };
+      const result = await Swal.fire({
+        title: `¿${labels[estado]} pago #${id}?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí',
+        cancelButtonText: 'No',
+        confirmButtonColor: estado === 'cancelado' ? '#ef4444' : '#22c55e',
+      });
+      if (!result.isConfirmed) return;
+      try {
+        const res = await fetch(`${API}/api/admin/pagos/${id}/estado`, {
+          method: 'POST', headers: getHeaders(),
+          body: JSON.stringify({ estado }),
+        });
+        if (res.ok) {
+          Swal.fire('Listo', `Pago marcado como ${labels[estado].toLowerCase()}`, 'success');
+          cargarRecargas();
+          cargarRetiros();
+        } else {
+          const err = await res.json();
+          Swal.fire('Error', err.detail || 'No se pudo actualizar', 'error');
+        }
       } catch(e) { console.error(e); }
     }
 

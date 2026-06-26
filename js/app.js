@@ -129,6 +129,90 @@ const ANIMALES = [
   { id: 36, numero: '36', nombre: 'CULEBRA',  icono: 'fa-worm' },
 ];
 
+const BANCOS = [
+  { codigo: '0001', nombre: 'Banco Central de Venezuela (BCV)' },
+  { codigo: '0102', nombre: 'Banco de Venezuela' },
+  { codigo: '0104', nombre: 'Banco Venezolano de Crédito' },
+  { codigo: '0105', nombre: 'Banco Mercantil' },
+  { codigo: '0108', nombre: 'Banco Provincial' },
+  { codigo: '0114', nombre: 'Bancaribe' },
+  { codigo: '0115', nombre: 'Banco Exterior' },
+  { codigo: '0116', nombre: 'Banco Occidental de Descuento (BOD)' },
+  { codigo: '0128', nombre: 'Banco Caroní' },
+  { codigo: '0134', nombre: 'Banesco' },
+  { codigo: '0137', nombre: 'Banco Sofitasa' },
+  { codigo: '0138', nombre: 'Banco Plaza' },
+  { codigo: '0146', nombre: 'Bangente' },
+  { codigo: '0149', nombre: 'Banco del Pueblo Soberano' },
+  { codigo: '0151', nombre: 'BFC Banco Fondo Común' },
+  { codigo: '0156', nombre: '100% Banco' },
+  { codigo: '0157', nombre: 'Del Sur Banco Universal' },
+  { codigo: '0163', nombre: 'Banco del Tesoro' },
+  { codigo: '0166', nombre: 'Banco Agrícola de Venezuela' },
+  { codigo: '0168', nombre: 'Bancrecer' },
+  { codigo: '0169', nombre: 'Mi Banco' },
+  { codigo: '0171', nombre: 'Banco Activo' },
+  { codigo: '0172', nombre: 'Bancamiga' },
+  { codigo: '0173', nombre: 'Banco Internacional de Desarrollo' },
+  { codigo: '0174', nombre: 'Banplus' },
+  { codigo: '0175', nombre: 'Banco Bicentenario' },
+  { codigo: '0177', nombre: 'Banco de la Fuerza Armada Nacional Bolivariana (BANFANB)' },
+  { codigo: '0190', nombre: 'Citibank' },
+  { codigo: '0191', nombre: 'Banco Nacional de Crédito' },
+  { codigo: '0601', nombre: 'Instituto Municipal de Crédito Popular' },
+];
+
+const CASA = {
+  nombre: 'Gabriel Alejandro Rosas Rosas',
+  banco: 'Banco Mercantil',
+  banco_codigo: '0105',
+  cedula: '27650586',
+  telefono: '04123656230',
+};
+
+const MOVIL_PREFIXES = ['412', '414', '416', '424', '426'];
+
+function normalizePhone(raw) {
+  const digits = raw.replace(/\D/g, '');
+  if (digits.startsWith('58') && digits.length > 10) return digits.slice(2);
+  if (digits.startsWith('0') && digits.length > 10) return digits.slice(1);
+  return digits;
+}
+
+function validarTelefonoVE(raw) {
+  const num = normalizePhone(raw);
+  if (num.length !== 10) return { valido: false, msg: 'Debe tener 10 dígitos (ej: 04121234567)' };
+  const prefix = num.slice(0, 3);
+  if (MOVIL_PREFIXES.includes(prefix)) return { valido: true, msg: '', num };
+  if (prefix.startsWith('2')) return { valido: true, msg: '', num };
+  return { valido: false, msg: 'Prefijo telefónico inválido para Venezuela' };
+}
+
+function formatPhone(num) {
+  if (!num || num.length < 10) return num || '';
+  return num.slice(0, 4) + '-' + num.slice(4);
+}
+
+function normalizeCedula(raw) {
+  let s = raw.replace(/[\s.-]+/g, '').toUpperCase();
+  if (/^[VE]\d+$/.test(s)) return s;
+  if (/^\d+$/.test(s)) return 'V' + s;
+  return raw.trim();
+}
+
+function validarCedulaVE(raw) {
+  const s = normalizeCedula(raw);
+  if (/^[VE]\d{1,8}$/.test(s)) return { valido: true, msg: '', cedula: s };
+  return { valido: false, msg: 'Formato: V-12345678 (V o E, hasta 8 dígitos)' };
+}
+
+function formatCedula(ced) {
+  if (!ced) return '';
+  const letra = ced.charAt(0);
+  const nums = ced.slice(1).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  return letra + '-' + nums;
+}
+
 async function logout() {
   Swal.fire({
     title: '¿Cerrar sesión?',
@@ -148,32 +232,77 @@ async function logout() {
 async function showRechargeModal() {
   const token = getToken();
   if (!token) return;
+
+  const bancosOpts = BANCOS.map(b => `<option value="${b.codigo}">${b.codigo} - ${b.nombre}</option>`).join('');
+  const hoy = new Date().toISOString().split('T')[0];
+
   Swal.fire({
     title: 'Recargar saldo',
     html: `
-      <div class="mb-3">
-        <label class="form-label">Monto a recargar (Bs)</label>
-        <input type="number" id="swal-recharge" class="form-control" min="1" step="0.5" placeholder="Ej: 50">
+      <div style="text-align:left;font-size:13px;background:#f0fdf4;padding:10px;border-radius:8px;margin-bottom:12px;border:1px solid #bbf7d0;">
+        <div class="mb-1 fw-bold text-success"><i class="fas fa-university me-1"></i> Depósito a:</div>
+        <div class="mb-1"><strong>Banco:</strong> ${CASA.banco} (${CASA.banco_codigo})</div>
+        <div class="mb-1"><strong>Titular:</strong> ${CASA.nombre}</div>
+        <div class="mb-1"><strong>Cédula:</strong> ${formatCedula(CASA.cedula)}</div>
+        <div class="mb-1"><strong>Teléfono:</strong> ${formatPhone(CASA.telefono)}</div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Monto a recargar (Bs) <span class="text-danger">*</span></label>
+        <input type="number" id="swal-monto" class="form-control" min="1" step="0.5" placeholder="Ej: 50">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Número de referencia <span class="text-danger">*</span></label>
+        <input type="text" id="swal-ref" class="form-control" placeholder="Ej: 123456789">
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Tu banco (desde dónde pagaste) <span class="text-danger">*</span></label>
+        <select id="swal-banco" class="form-select">
+          <option value="">Selecciona tu banco</option>
+          ${bancosOpts}
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Tipo de pago <span class="text-danger">*</span></label>
+        <select id="swal-tipo" class="form-select">
+          <option value="MOVIL_PAY">Pago Móvil</option>
+          <option value="TRANSFER">Transferencia</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label">Fecha del pago</label>
+        <input type="date" id="swal-fecha" class="form-control" value="${hoy}">
       </div>
     `,
     showCancelButton: true,
-    confirmButtonText: 'Recargar',
+    confirmButtonText: 'Solicitar recarga',
     cancelButtonText: 'Cancelar',
     confirmButtonColor: '#22c55e',
     preConfirm: () => {
-      const val = parseFloat(document.getElementById('swal-recharge').value);
-      if (!val || val <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
-      return val;
+      const monto = parseFloat(document.getElementById('swal-monto').value);
+      if (!monto || monto <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
+      const ref = document.getElementById('swal-ref').value.trim();
+      if (!ref) { Swal.showValidationMessage('Ingresa el número de referencia'); return false; }
+      const banco = document.getElementById('swal-banco').value;
+      if (!banco) { Swal.showValidationMessage('Selecciona tu banco'); return false; }
+      const tipo = document.getElementById('swal-tipo').value;
+      const fecha = document.getElementById('swal-fecha').value;
+      return { monto, referencia: ref, banco_origen: banco, movement_type: tipo, fecha };
     }
   }).then(async res => {
     if (!res.isConfirmed) return;
     const r = await apiFetch('/api/pagos/recarga', {
       method: 'POST',
-      body: JSON.stringify({ monto: res.value, metodo: 'manual' }),
+      body: JSON.stringify({
+        monto: res.value.monto,
+        metodo: 'pago_movil',
+        referencia: res.value.referencia,
+        banco_origen: res.value.banco_origen,
+        movement_type: res.value.movement_type,
+        fecha: res.value.fecha,
+      }),
     });
     if (r.ok) {
-      await updateBalanceDisplay();
-      Swal.fire('¡Listo!', `Solicitud de recarga por Bs ${res.value.toFixed(2)} registrada`, 'success');
+      Swal.fire('¡Solicitud enviada!', 'Tu recarga está pendiente de verificación', 'success');
     } else {
       Swal.fire('Error', 'No se pudo procesar la recarga', 'error');
     }

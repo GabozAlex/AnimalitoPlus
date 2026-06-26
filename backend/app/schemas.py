@@ -14,6 +14,7 @@ class UsuarioCreate(BaseModel):
     cedula: Optional[str] = None
     telefono: Optional[str] = None
     banco: Optional[str] = None
+    banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
 
 
@@ -31,6 +32,7 @@ class UsuarioOut(BaseModel):
     cedula: Optional[str] = None
     telefono: Optional[str] = None
     banco: Optional[str] = None
+    banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
     rol: str
     bloqueado: bool
@@ -45,6 +47,7 @@ class UsuarioUpdate(BaseModel):
     cedula: Optional[str] = None
     telefono: Optional[str] = None
     banco: Optional[str] = None
+    banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
 
 
@@ -141,10 +144,45 @@ class RecargaCreate(BaseModel):
     monto: float
     metodo: str
     referencia: Optional[str] = None
+    banco_origen: Optional[str] = None
+    movement_type: Optional[str] = None
+    fecha: Optional[str] = None
 
 
 class RetiroCreate(BaseModel):
     monto: float
+
+
+class AdminPagoUpdate(BaseModel):
+    estado: str  # "en_proceso", "completado", "cancelado"
+
+
+class TransaccionOut(BaseModel):
+    id: int
+    usuario_id: int
+    tipo: str
+    monto: float
+    metodo: Optional[str] = None
+    referencia: Optional[str] = None
+    estado: Optional[str] = 'pendiente'
+    descripcion: Optional[str] = None
+    created_at: str
+    usuario_nombre: Optional[str] = None
+    usuario_cedula: Optional[str] = None
+    usuario_telefono: Optional[str] = None
+    usuario_banco: Optional[str] = None
+    usuario_banco_codigo: Optional[str] = None
+    usuario_titular: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+    @field_validator('created_at', mode='before')
+    @classmethod
+    def convert_dt(cls, v):
+        if isinstance(v, (date, datetime)):
+            return v.isoformat()
+        return v
 
 
 # ===== ESQUEMAS DE ADMIN =====

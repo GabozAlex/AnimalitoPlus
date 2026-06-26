@@ -44,6 +44,7 @@ class Usuario(Base):
     cedula = Column(String(20))
     telefono = Column(String(20))
     banco = Column(String(100))
+    banco_codigo = Column(String(10))
     pago_movil_titular = Column(String(100))
     rol = Column(SAEnum(RolEnum), default=RolEnum.user)
     bloqueado = Column(Boolean, default=False)
@@ -101,6 +102,7 @@ class Transaccion(Base):
     monto = Column(Float, nullable=False)
     metodo = Column(SAEnum(MetodoPagoEnum))
     referencia = Column(String(255))
+    estado = Column(String(20), default='pendiente')
     descripcion = Column(Text)
     created_at = Column(DateTime, default=datetime.now)
 

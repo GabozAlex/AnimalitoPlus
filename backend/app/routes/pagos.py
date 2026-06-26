@@ -1,10 +1,12 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date
+import json
 
 from app.database import get_db
 from app.models import Usuario, Transaccion
-from app.schemas import RecargaCreate, RetiroCreate
+from app.schemas import RecargaCreate, RetiroCreate, TransaccionOut
 from app.auth import get_current_user
 
 router = APIRouter(prefix="/api/pagos", tags=["pagos"])
@@ -19,18 +21,27 @@ def solicitar_recarga(
     if data.monto <= 0:
         raise HTTPException(status_code=400, detail="Monto inválido")
 
+    extra = {}
+    if data.banco_origen:
+        extra["banco_origen"] = data.banco_origen
+    if data.movement_type:
+        extra["movement_type"] = data.movement_type
+    if data.fecha:
+        extra["fecha_pago"] = data.fecha
+
     tx = Transaccion(
         usuario_id=user.id,
         tipo="recarga",
         monto=data.monto,
         metodo=data.metodo,
         referencia=data.referencia,
-        descripcion=f"Recarga solicitada vía {data.metodo}",
+        descripcion=json.dumps(extra) if extra else None,
+        estado="pendiente",
     )
     db.add(tx)
     db.commit()
 
-    return {"mensaje": "Solicitud de recarga registrada", "id": tx.id}
+    return {"mensaje": "Solicitud de recarga registrada", "id": tx.id, "estado": "pendiente"}
 
 
 @router.post("/retiro")
@@ -49,24 +60,50 @@ def solicitar_retiro(
         tipo="retiro",
         monto=data.monto,
         descripcion="Solicitud de retiro",
+        estado="pendiente",
     )
     db.add(tx)
     db.commit()
 
-    return {"mensaje": "Solicitud de retiro registrada", "id": tx.id}
+    return {"mensaje": "Solicitud de retiro registrada", "id": tx.id, "estado": "pendiente"}
 
 
-@router.get("/historial")
+@router.get("/historial", response_model=list[TransaccionOut])
 def historial_pagos(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
-    limit: int = 20,
+    tipo: Optional[str] = None,
+    limit: int = 50,
 ):
-    txs = (
-        db.query(Transaccion)
-        .filter(Transaccion.usuario_id == user.id)
-        .order_by(Transaccion.created_at.desc())
-        .limit(limit)
-        .all()
-    )
-    return txs
+    query = db.query(Transaccion).filter(Transaccion.usuario_id == user.id)
+    if tipo:
+        query = query.filter(Transaccion.tipo == tipo)
+    txs = query.order_by(Transaccion.created_at.desc()).limit(limit).all()
+
+    result = []
+    for tx in txs:
+        extra = {}
+        if tx.descripcion:
+            try:
+                extra = json.loads(tx.descripcion)
+            except (json.JSONDecodeError, TypeError):
+                extra = {"nota": tx.descripcion}
+        u = db.query(Usuario).filter(Usuario.id == tx.usuario_id).first()
+        result.append({
+            "id": tx.id,
+            "usuario_id": tx.usuario_id,
+            "tipo": tx.tipo,
+            "monto": tx.monto,
+            "metodo": tx.metodo,
+            "referencia": tx.referencia,
+            "estado": tx.estado,
+            "descripcion": tx.descripcion,
+            "created_at": tx.created_at,
+            "usuario_nombre": f"{u.nombre} {u.apellido}" if u else None,
+            "usuario_cedula": u.cedula if u else None,
+            "usuario_telefono": u.telefono if u else None,
+            "usuario_banco": u.banco if u else None,
+            "usuario_banco_codigo": u.banco_codigo if u else None,
+            "usuario_titular": u.pago_movil_titular if u else None,
+        })
+    return result

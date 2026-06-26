@@ -282,6 +282,10 @@ ul { list-style: none; padding: 0; margin: 0; }
 .auth-card .error-msg.show { display: block; }
 .auth-card .is-invalid { border-color: var(--danger) !important; }
 
+.error-msg { color: var(--danger); font-size: 13px; display: none; margin-top: 4px; }
+.error-msg.show { display: block; }
+.is-invalid { border-color: var(--danger) !important; }
+
 /* ===== LOTTERY SELECTOR ===== */
 .lottery-selector {
   display: flex;
