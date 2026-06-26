@@ -17,7 +17,6 @@ const HORARIOS = [
 document.addEventListener('DOMContentLoaded', () => {
   const token = requireAuth();
   if (!token) return;
-  loadUserInfo();
   updateBalanceDisplay();
   renderAnimalGrid();
   renderBetSlip();
@@ -26,14 +25,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setupBetAmounts();
   document.getElementById('btnPlay')?.addEventListener('click', playBets);
 });
-
-async function loadUserInfo() {
-  const adminLink = document.getElementById('adminLink');
-  if (adminLink) {
-    const user = getCurrentUser();
-    if (user && user.rol === 'admin') adminLink.classList.remove('d-none');
-  }
-}
 
 function setupBetAmounts() {
   document.querySelectorAll('.bet-amt').forEach(el => {

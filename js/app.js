@@ -46,9 +46,19 @@ async function updateBalanceDisplay() {
     if (res.ok) {
       const data = await res.json();
       if (navEl) navEl.textContent = data.saldo.toFixed(2);
+      if (window.Alpine) Alpine.store('app').balance = data.saldo;
     }
   } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
+
+document.addEventListener('alpine:init', () => {
+  const user = getCurrentUser();
+  Alpine.store('app', {
+    token: getToken(),
+    user: user,
+    balance: user ? user.saldo : 0,
+  });
+});
 
 async function renderResults(fecha) {
   const container = document.getElementById('resultsBody');
