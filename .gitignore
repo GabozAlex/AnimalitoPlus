@@ -5,3 +5,8 @@ Jugar _ Juegoactivo.html
 Jugar _ Juegoactivo_files/
 🎰 LosAnimalitos.Net - Tu Sitio Seguro.html
 🎰 LosAnimalitos.Net - Tu Sitio Seguro_files/
+
+# Virtual environment
+.venv/
+__pycache__/
+*.pyc
