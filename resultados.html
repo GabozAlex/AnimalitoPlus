@@ -58,6 +58,7 @@
     <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
     <a href="resultados.html" class="active"><i class="fas fa-list"></i> Resultados</a>
     <a href="datos.html"><i class="fas fa-chart-bar"></i> Datos</a>
+    <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
     <a href="login.html"><i class="fas fa-user"></i> Ingresar</a>
   </nav>
 
@@ -70,13 +71,12 @@
       const picker = document.getElementById('datePicker');
       picker.valueAsDate = new Date();
       renderResults();
-
       picker.addEventListener('change', filterResults);
     });
 
-    function filterResults() {
+    async function filterResults() {
       const val = document.getElementById('datePicker').value;
-      renderResults(val);
+      await renderResults(val);
     }
   </script>
 </body>

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Perfil - AnimalitoPlus</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- HEADER -->
+  <header class="main-header">
+    <a href="index.html" class="logo">
+      <i class="fas fa-paw"></i> Animalito<span>Plus</span>
+    </a>
+    <nav class="nav-links">
+      <a href="dashboard.html">Jugar</a>
+      <a href="resultados.html">Resultados</a>
+      <a href="datos.html">Estadísticas</a>
+      <a href="perfil.html" class="active">Perfil</a>
+      <a href="admin.html" id="adminLink" class="d-none"><i class="fas fa-cog"></i> Admin</a>
+      <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+    </nav>
+    <a href="#" onclick="logout()" class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
+  </header>
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <h4><i class="fas fa-user me-2"></i> Mi Perfil</h4>
+  </div>
+
+  <!-- MIS DATOS -->
+  <div class="section" style="padding-top:0;">
+    <div class="stats-card mb-3">
+      <h5><i class="fas fa-id-card me-1 text-primary"></i> Mis Datos</h5>
+      <div id="misDatos">
+        <div class="text-muted text-center py-3">Cargando...</div>
+      </div>
+    </div>
+
+    <!-- DATOS BANCARIOS -->
+    <div class="stats-card mb-3">
+      <h5><i class="fas fa-university me-1 text-gold"></i> Datos Bancarios</h5>
+      <div id="datosBancarios">
+        <div class="text-muted text-center py-3">Cargando...</div>
+      </div>
+    </div>
+
+    <!-- MIS TICKETS -->
+    <div class="stats-card">
+      <h5><i class="fas fa-ticket-alt me-1 text-success"></i> Mis Tickets</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-custom" style="font-size:12px;">
+          <thead><tr><th>Fecha</th><th>Lotería</th><th>Animales</th><th>Monto</th><th>Estado</th></tr></thead>
+          <tbody id="ticketsBody">
+            <tr><td colspan="5" class="text-center text-muted py-3">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
+    <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
+    <a href="datos.html"><i class="fas fa-chart-bar"></i> Datos</a>
+    <a href="perfil.html" class="active"><i class="fas fa-user"></i> Perfil</a>
+    <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
+  </nav>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      const token = requireAuth();
+      if (!token) return;
+      await cargarPerfil();
+      await cargarTickets();
+      const user = getCurrentUser();
+      const al = document.getElementById('adminLink');
+      if (al && user && user.rol === 'admin') al.classList.remove('d-none');
+    });
+
+    async function cargarPerfil() {
+      const res = await apiFetch('/api/auth/perfil');
+      if (!res.ok) return;
+      const u = await res.json();
+      localStorage.setItem(USER_KEY, JSON.stringify(u));
+
+      document.getElementById('misDatos').innerHTML = `
+        <div class="stat-row"><span>Nombre</span><span class="stat-count">${u.nombre} ${u.apellido}</span></div>
+        <div class="stat-row"><span>Correo</span><span class="stat-count">${u.correo}</span></div>
+        <div class="stat-row"><span>Teléfono</span><span class="stat-count">${u.telefono || '—'}</span></div>
+        <div class="stat-row"><span>Saldo</span><span class="stat-count text-gold fw-bold">Bs ${u.saldo.toFixed(2)}</span></div>
+      `;
+
+      document.getElementById('datosBancarios').innerHTML = `
+        <div class="mb-2">
+          <label class="form-label" style="font-size:13px;">Cédula</label>
+          <input type="text" class="form-control form-control-sm" id="banCedula" value="${u.cedula || ''}" placeholder="Ej: V-12345678">
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:13px;">Banco</label>
+          <input type="text" class="form-control form-control-sm" id="banBanco" value="${u.banco || ''}" placeholder="Ej: Banco Mercantil">
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:13px;">Teléfono Pago Móvil</label>
+          <input type="text" class="form-control form-control-sm" id="banTelefono" value="${u.telefono || ''}" placeholder="Ej: 04121234567">
+        </div>
+        <div class="mb-2">
+          <label class="form-label" style="font-size:13px;">Titular</label>
+          <input type="text" class="form-control form-control-sm" id="banTitular" value="${u.pago_movil_titular || ''}" placeholder="Nombre del titular">
+        </div>
+        <button class="btn btn-primary btn-sm mt-2" onclick="guardarDatosBancarios()"><i class="fas fa-save me-1"></i> Guardar</button>
+      `;
+    }
+
+    async function guardarDatosBancarios() {
+      const body = {
+        cedula: document.getElementById('banCedula').value.trim(),
+        banco: document.getElementById('banBanco').value.trim(),
+        telefono: document.getElementById('banTelefono').value.trim(),
+        pago_movil_titular: document.getElementById('banTitular').value.trim(),
+      };
+      const res = await apiFetch('/api/auth/perfil', {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        Swal.fire('Guardado', 'Datos bancarios actualizados', 'success');
+        cargarPerfil();
+      } else {
+        Swal.fire('Error', 'No se pudieron guardar los datos', 'error');
+      }
+    }
+
+    async function cargarTickets() {
+      const res = await apiFetch('/api/apuestas?limit=50');
+      if (!res.ok) { document.getElementById('ticketsBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Error al cargar</td></tr>'; return; }
+      const apuestas = await res.json();
+      if (apuestas.length === 0) {
+        document.getElementById('ticketsBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin tickets aún</td></tr>';
+        return;
+      }
+      const badges = { ganada: 'bg-success', perdida: 'bg-danger', pendiente: 'bg-warning text-dark', pagada: 'bg-info' };
+      document.getElementById('ticketsBody').innerHTML = apuestas.map(a => {
+        const animales = (a.detalles || []).map(d => {
+          const an = ANIMALES.find(x => String(x.id) === d.animal_id);
+          return an ? an.nombre : d.animal_id;
+        }).join(', ');
+        const badge = badges[a.estado] || 'bg-secondary';
+        return `<tr>
+          <td>${a.fecha}</td>
+          <td>${a.loteria}</td>
+          <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${animales}">${animales}</td>
+          <td>Bs ${a.total.toFixed(2)}</td>
+          <td><span class="badge ${badge}">${a.estado}</span></td>
+        </tr>`;
+      }).join('');
+    }
+  </script>
+</body>
+</html>

@@ -1,80 +1,98 @@
-/* ===== NAVEGACIÓN ACTIVA ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  const page = window.location.pathname.split('/').pop() || 'index.html';
-  document.querySelectorAll('.nav-links a, .bottom-nav a').forEach(link => {
-    const href = link.getAttribute('href');
-    if (href === page) link.classList.add('active');
-  });
-});
+const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')
+  ? 'http://localhost:8000'
+  : 'https://TU_API.vercel.app';
 
-/* ===== PROTECCIÓN RUTAS ===== */
+const TOKEN_KEY = 'animalito_token';
+const USER_KEY = 'animalito_user';
+
+function getToken() {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearAuth() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
 function requireAuth() {
-  const user = JSON.parse(localStorage.getItem('animalito_user'));
-  if (!user) {
+  const token = getToken();
+  if (!token) {
     window.location.href = 'login.html';
     return null;
   }
-  return user;
+  return token;
 }
 
-/* ===== USUARIO ACTUAL ===== */
 function getCurrentUser() {
-  return JSON.parse(localStorage.getItem('animalito_user'));
+  const data = localStorage.getItem(USER_KEY);
+  return data ? JSON.parse(data) : null;
 }
 
-/* ===== SALDO ===== */
-function updateBalanceDisplay() {
+function apiFetch(path, options = {}) {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json', ...options.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return fetch(`${API_BASE}${path}`, { ...options, headers });
+}
+
+async function updateBalanceDisplay() {
   const el = document.getElementById('balanceDisplay');
-  const user = getCurrentUser();
-  if (el && user) {
-    el.textContent = user.balance.toFixed(2);
-  }
+  if (!el) return;
+  try {
+    const res = await apiFetch('/api/auth/balance');
+    if (res.ok) {
+      const data = await res.json();
+      el.textContent = data.saldo.toFixed(2);
+    }
+  } catch {}
 }
 
-/* ===== ANIMALES (38) ===== */
 const ANIMALES = [
-  { id: 1,  nombre: 'Ratón',     icono: 'fa-rat' },
-  { id: 2,  nombre: 'Gallina',   icono: 'fa-kiwi-bird' },
-  { id: 3,  nombre: 'Gato',      icono: 'fa-cat' },
-  { id: 4,  nombre: 'Perro',     icono: 'fa-dog' },
-  { id: 5,  nombre: 'Serpiente', icono: 'fa-snake' },
-  { id: 6,  nombre: 'Tigre',     icono: 'fa-paw' },
-  { id: 7,  nombre: 'Dragón',    icono: 'fa-dragon' },
-  { id: 8,  nombre: 'Conejo',    icono: 'fa-rabbit' },
-  { id: 9,  nombre: 'Mono',      icono: 'fa-monkey' },
-  { id: 10, nombre: 'Caballo',   icono: 'fa-horse' },
-  { id: 11, nombre: 'Oveja',     icono: 'fa-sheep' },
-  { id: 12, nombre: 'Vaca',      icono: 'fa-cow' },
-  { id: 13, nombre: 'Elefante',  icono: 'fa-elephant' },
-  { id: 14, nombre: 'Mariposa',  icono: 'fa-butterfly' },
-  { id: 15, nombre: 'Gallo',     icono: 'fa-kiwi-bird' },
-  { id: 16, nombre: 'León',      icono: 'fa-paw' },
-  { id: 17, nombre: 'Pavo',      icono: 'fa-paw' },
-  { id: 18, nombre: 'Búfalo',    icono: 'fa-paw' },
-  { id: 19, nombre: 'Zorro',     icono: 'fa-paw' },
-  { id: 20, nombre: 'Loro',      icono: 'fa-dove' },
-  { id: 21, nombre: 'Cocodrilo', icono: 'fa-lizard' },
-  { id: 22, nombre: 'Tortuga',   icono: 'fa-turtle' },
-  { id: 23, nombre: 'Cebra',     icono: 'fa-paw' },
-  { id: 24, nombre: 'Oso',       icono: 'fa-paw' },
-  { id: 25, nombre: 'Águila',    icono: 'fa-feather' },
-  { id: 26, nombre: 'Lobo',      icono: 'fa-paw' },
-  { id: 27, nombre: 'Ballena',   icono: 'fa-fish' },
-  { id: 28, nombre: 'Delfín',    icono: 'fa-fish' },
-  { id: 29, nombre: 'Cangrejo',  icono: 'fa-crab' },
-  { id: 30, nombre: 'Camello',   icono: 'fa-horse' },
-  { id: 31, nombre: 'Murciélago',icono: 'fa-paw' },
-  { id: 32, nombre: 'Rana',      icono: 'fa-frog' },
-  { id: 33, nombre: 'Abeja',     icono: 'fa-bee' },
-  { id: 34, nombre: 'Hormiga',   icono: 'fa-ant' },
-  { id: 35, nombre: 'Pato',      icono: 'fa-duck' },
-  { id: 36, nombre: 'Burro',     icono: 'fa-horse' },
-  { id: 37, nombre: 'Águila 2',  icono: 'fa-feather' },
-  { id: 38, nombre: 'León 2',    icono: 'fa-paw' },
+  { id: '0',  numero: '0',  nombre: 'DELFIN',   icono: 'fa-fish' },
+  { id: '00', numero: '00', nombre: 'BALLENA',  icono: 'fa-fish' },
+  { id: 1,  numero: '01', nombre: 'CARNERO',  icono: 'fa-sheep' },
+  { id: 2,  numero: '02', nombre: 'TORO',     icono: 'fa-cow' },
+  { id: 3,  numero: '03', nombre: 'CIEMPIES', icono: 'fa-bug' },
+  { id: 4,  numero: '04', nombre: 'ALACRAN',  icono: 'fa-bug' },
+  { id: 5,  numero: '05', nombre: 'LEON',     icono: 'fa-paw' },
+  { id: 6,  numero: '06', nombre: 'RANA',     icono: 'fa-frog' },
+  { id: 7,  numero: '07', nombre: 'PERICO',   icono: 'fa-dove' },
+  { id: 8,  numero: '08', nombre: 'RATON',    icono: 'fa-rat' },
+  { id: 9,  numero: '09', nombre: 'AGUILA',   icono: 'fa-feather' },
+  { id: 10, numero: '10', nombre: 'TIGRE',    icono: 'fa-paw' },
+  { id: 11, numero: '11', nombre: 'GATO',     icono: 'fa-cat' },
+  { id: 12, numero: '12', nombre: 'CABALLO',  icono: 'fa-horse' },
+  { id: 13, numero: '13', nombre: 'MONO',     icono: 'fa-monkey' },
+  { id: 14, numero: '14', nombre: 'PALOMA',   icono: 'fa-dove' },
+  { id: 15, numero: '15', nombre: 'ZORRO',    icono: 'fa-paw' },
+  { id: 16, numero: '16', nombre: 'OSO',      icono: 'fa-paw' },
+  { id: 17, numero: '17', nombre: 'PAVO',     icono: 'fa-kiwi-bird' },
+  { id: 18, numero: '18', nombre: 'BURRO',    icono: 'fa-horse' },
+  { id: 19, numero: '19', nombre: 'CHIVO',    icono: 'fa-paw' },
+  { id: 20, numero: '20', nombre: 'COCHINO',  icono: 'fa-piggy-bank' },
+  { id: 21, numero: '21', nombre: 'GALLO',    icono: 'fa-kiwi-bird' },
+  { id: 22, numero: '22', nombre: 'CAMELLO',  icono: 'fa-horse' },
+  { id: 23, numero: '23', nombre: 'CEBRA',    icono: 'fa-paw' },
+  { id: 24, numero: '24', nombre: 'IGUANA',   icono: 'fa-lizard' },
+  { id: 25, numero: '25', nombre: 'GALLINA',  icono: 'fa-kiwi-bird' },
+  { id: 26, numero: '26', nombre: 'VACA',     icono: 'fa-cow' },
+  { id: 27, numero: '27', nombre: 'PERRO',    icono: 'fa-dog' },
+  { id: 28, numero: '28', nombre: 'ZAMURO',   icono: 'fa-feather' },
+  { id: 29, numero: '29', nombre: 'ELEFANTE', icono: 'fa-elephant' },
+  { id: 30, numero: '30', nombre: 'CAIMAN',   icono: 'fa-lizard' },
+  { id: 31, numero: '31', nombre: 'LAPA',     icono: 'fa-paw' },
+  { id: 32, numero: '32', nombre: 'ARDILLA',  icono: 'fa-paw' },
+  { id: 33, numero: '33', nombre: 'PESCADO',  icono: 'fa-fish' },
+  { id: 34, numero: '34', nombre: 'VENADO',   icono: 'fa-paw' },
+  { id: 35, numero: '35', nombre: 'JIRAFA',   icono: 'fa-paw' },
+  { id: 36, numero: '36', nombre: 'CULEBRA',  icono: 'fa-snake' },
 ];
 
-/* ===== CERRAR SESIÓN ===== */
-function logout() {
+async function logout() {
   Swal.fire({
     title: '¿Cerrar sesión?',
     icon: 'question',
@@ -84,14 +102,15 @@ function logout() {
     confirmButtonColor: '#0ea5e9',
   }).then(res => {
     if (res.isConfirmed) {
-      localStorage.removeItem('animalito_user');
+      clearAuth();
       window.location.href = 'index.html';
     }
   });
 }
 
-/* ===== MODAL RECARGA / RETIRO ===== */
-function showRechargeModal() {
+async function showRechargeModal() {
+  const token = getToken();
+  if (!token) return;
   Swal.fire({
     title: 'Recargar saldo',
     html: `
@@ -106,24 +125,27 @@ function showRechargeModal() {
     confirmButtonColor: '#22c55e',
     preConfirm: () => {
       const val = parseFloat(document.getElementById('swal-recharge').value);
-      if (!val || val <= 0) {
-        Swal.showValidationMessage('Ingresa un monto válido');
-        return false;
-      }
+      if (!val || val <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
       return val;
     }
-  }).then(res => {
-    if (res.isConfirmed) {
-      const user = getCurrentUser();
-      user.balance += res.value;
-      localStorage.setItem('animalito_user', JSON.stringify(user));
-      updateBalanceDisplay();
-      Swal.fire('¡Listo!', `Se recargaron Bs ${res.value.toFixed(2)}`, 'success');
+  }).then(async res => {
+    if (!res.isConfirmed) return;
+    const r = await apiFetch('/api/pagos/recarga', {
+      method: 'POST',
+      body: JSON.stringify({ monto: res.value, metodo: 'manual' }),
+    });
+    if (r.ok) {
+      await updateBalanceDisplay();
+      Swal.fire('¡Listo!', `Solicitud de recarga por Bs ${res.value.toFixed(2)} registrada`, 'success');
+    } else {
+      Swal.fire('Error', 'No se pudo procesar la recarga', 'error');
     }
   });
 }
 
-function showWithdrawModal() {
+async function showWithdrawModal() {
+  const token = getToken();
+  if (!token) return;
   Swal.fire({
     title: 'Retirar saldo',
     html: `
@@ -138,23 +160,29 @@ function showWithdrawModal() {
     confirmButtonColor: '#ef4444',
     preConfirm: () => {
       const val = parseFloat(document.getElementById('swal-withdraw').value);
-      if (!val || val <= 0) {
-        Swal.showValidationMessage('Ingresa un monto válido');
-        return false;
-      }
+      if (!val || val <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
       return val;
     }
-  }).then(res => {
-    if (res.isConfirmed) {
-      const user = getCurrentUser();
-      if (res.value > user.balance) {
-        Swal.fire('Saldo insuficiente', 'No tienes suficiente saldo para retirar ese monto', 'error');
-        return;
-      }
-      user.balance -= res.value;
-      localStorage.setItem('animalito_user', JSON.stringify(user));
-      updateBalanceDisplay();
-      Swal.fire('¡Listo!', `Solicitaste retiro de Bs ${res.value.toFixed(2)}`, 'success');
+  }).then(async res => {
+    if (!res.isConfirmed) return;
+    const r = await apiFetch('/api/pagos/retiro', {
+      method: 'POST',
+      body: JSON.stringify({ monto: res.value }),
+    });
+    if (r.ok) {
+      await updateBalanceDisplay();
+      Swal.fire('¡Listo!', `Solicitud de retiro de Bs ${res.value.toFixed(2)} registrada`, 'success');
+    } else {
+      const err = await r.json();
+      Swal.fire('Error', err.detail || 'Saldo insuficiente', 'error');
     }
   });
 }
+
+document.addEventListener('DOMContentLoaded', () => {
+  const page = window.location.pathname.split('/').pop() || 'index.html';
+  document.querySelectorAll('.nav-links a, .bottom-nav a').forEach(link => {
+    const href = link.getAttribute('href');
+    if (href === page) link.classList.add('active');
+  });
+});
