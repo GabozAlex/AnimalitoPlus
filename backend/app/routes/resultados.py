@@ -17,14 +17,22 @@ def listar_resultados(
     fecha: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
+    target_date = date.fromisoformat(fecha) if fecha else date.today()
+
     query = db.query(Resultado)
     if loteria:
         query = query.filter(Resultado.loteria == loteria)
-    if fecha:
-        query = query.filter(Resultado.fecha == fecha)
-    else:
-        query = query.filter(Resultado.fecha == date.today())
-    return query.order_by(Resultado.horario).all()
+    query = query.filter(Resultado.fecha == target_date)
+
+    results = query.order_by(Resultado.horario).all()
+
+    if not results:
+        from app.scraper import run_scraper_save
+        fecha_str = target_date.isoformat()
+        run_scraper_save(fecha_str, db)
+        results = query.order_by(Resultado.horario).all()
+
+    return results
 
 
 @router.post("", response_model=ResultadoOut)
