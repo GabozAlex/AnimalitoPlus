@@ -7,9 +7,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="css/style.css">
-  <style>[x-cloak]{display:none!important}</style>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
 </head>
-<body x-data>
+<body>
 
   <!-- TOPBAR -->
   <div class="topbar">
@@ -29,17 +29,11 @@
     </a>
     <nav class="nav-links">
       <a href="index.html" class="active"><i class="fas fa-home"></i> Inicio</a>
-      <a href="login.html" x-show="!$store.app.token" x-cloak><i class="fas fa-sign-in-alt"></i> Ingresar</a>
-      <a href="register.html" x-show="!$store.app.token" x-cloak><i class="fas fa-user-plus"></i> Registro</a>
+      <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
+      <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
       <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
       <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
-      <a href="dashboard.html" x-show="$store.app.token" x-cloak><i class="fas fa-gamepad"></i> Jugar</a>
-      <a href="perfil.html" x-show="$store.app.token" x-cloak><i class="fas fa-user"></i> Perfil</a>
-      <a href="#" onclick="logout()" x-show="$store.app.token" x-cloak><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
-    <div class="header-balance" x-show="$store.app.token" x-cloak><i class="fas fa-wallet me-1"></i> Bs <span x-text="$store.app.balance.toFixed(2)">0.00</span></div>
-    <a href="#" onclick="logout()" x-show="$store.app.token" x-cloak class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
-    <a href="login.html" x-show="!$store.app.token" x-cloak class="btn btn-gold btn-sm d-md-none"><i class="fas fa-user"></i></a>
   </header>
 
   <!-- HERO -->
@@ -163,24 +157,14 @@
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <a href="index.html" class="active"><i class="fas fa-home"></i> Inicio</a>
-    <a href="dashboard.html" x-show="$store.app.token" x-cloak><i class="fas fa-gamepad"></i> Jugar</a>
-    <a href="login.html" x-show="!$store.app.token" x-cloak><i class="fas fa-sign-in-alt"></i> Ingresar</a>
-    <a href="register.html" x-show="!$store.app.token" x-cloak><i class="fas fa-user-plus"></i> Registro</a>
+    <a href="login.html"><i class="fas fa-sign-in-alt"></i> Ingresar</a>
+    <a href="register.html"><i class="fas fa-user-plus"></i> Registro</a>
     <a href="resultados.html"><i class="fas fa-list"></i> Resultados</a>
     <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
-    <a href="perfil.html" x-show="$store.app.token" x-cloak><i class="fas fa-user"></i> Perfil</a>
-    <a href="#" onclick="logout()" x-show="$store.app.token" x-cloak><i class="fas fa-sign-out-alt"></i> Salir</a>
   </nav>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <script>
-    document.addEventListener('alpine:init', () => {
-      const u = JSON.parse(localStorage.getItem('animalito_user') || 'null');
-      Alpine.store('app', { token: localStorage.getItem('animalito_token'), user: u, balance: u ? u.saldo : 0 });
-    });
-  </script>
-  <script defer src="//cdn.jsdelivr.net/npm/alpinejs@3"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

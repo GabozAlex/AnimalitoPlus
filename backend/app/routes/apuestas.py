@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date, datetime
@@ -74,11 +75,17 @@ def crear_apuesta(
 def listar_apuestas(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
-    limit: int = 20,
+    limit: int = 200,
+    loteria: Optional[str] = None,
+    fecha: Optional[str] = None,
 ):
+    query = db.query(Apuesta).filter(Apuesta.usuario_id == user.id)
+    if loteria:
+        query = query.filter(Apuesta.loteria == loteria)
+    if fecha:
+        query = query.filter(Apuesta.fecha == date.fromisoformat(fecha))
     apuestas = (
-        db.query(Apuesta)
-        .filter(Apuesta.usuario_id == user.id)
+        query
         .order_by(Apuesta.created_at.desc())
         .limit(limit)
         .all()

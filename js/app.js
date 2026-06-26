@@ -51,10 +51,11 @@ async function updateBalanceDisplay() {
   } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
 
-async function renderResults(fecha) {
+async function renderResults(fecha, loteria) {
   const container = document.getElementById('resultsBody');
   if (!container) return;
-  const params = fecha ? `?fecha=${fecha}` : '';
+  let params = fecha ? `?fecha=${fecha}` : '';
+  if (loteria) params += (params ? '&' : '?') + `loteria=${encodeURIComponent(loteria)}`;
 
   container.innerHTML = '<tr><td colspan="3" class="text-center text-muted py-4">🔍 Consultando resultados...</td></tr>';
 
