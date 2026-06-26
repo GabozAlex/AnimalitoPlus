@@ -128,7 +128,7 @@
           <td>${a.fecha}</td>
           <td>${LOTERIAS[a.loteria] || a.loteria}</td>
           <td>${a.horario}</td>
-          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${animales.replace(/<[^>]+>/g,'')}">${animales}</td>
+          <td>${animales}</td>
           <td class="fw-bold">Bs ${a.total.toFixed(2)}</td>
           <td><span class="${badge}">${a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}</span></td>
         </tr>`;

@@ -452,9 +452,9 @@
     function accionPago(p) {
       if (p.estado === 'completado' || p.estado === 'cancelado') return '—';
       return `
-        <button class="btn btn-sm btn-success mb-1" onclick="cambiarEstadoPago(${p.id},'completado')" title="Confirmar"><i class="fas fa-check"></i></button>
-        <button class="btn btn-sm btn-info mb-1" onclick="cambiarEstadoPago(${p.id},'en_proceso')" title="En Proceso"><i class="fas fa-spinner"></i></button>
-        <button class="btn btn-sm btn-danger mb-1" onclick="cambiarEstadoPago(${p.id},'cancelado')" title="Cancelar"><i class="fas fa-times"></i></button>
+        <button class="btn btn-sm btn-success mb-1" onclick="cambiarEstadoPago(${p.id},'completado')" title="Confirmar"><i class="fas fa-check me-1"></i>Confirmar</button>
+        <button class="btn btn-sm btn-info mb-1" onclick="cambiarEstadoPago(${p.id},'en_proceso')" title="En Proceso"><i class="fas fa-spinner me-1"></i>Proceso</button>
+        <button class="btn btn-sm btn-danger mb-1" onclick="cambiarEstadoPago(${p.id},'cancelado')" title="Cancelar"><i class="fas fa-times me-1"></i>Cancelar</button>
       `;
     }
 
