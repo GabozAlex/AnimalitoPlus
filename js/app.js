@@ -13,6 +13,11 @@ function setToken(token) {
   localStorage.setItem(TOKEN_KEY, token);
 }
 
+function getUser() {
+  const data = localStorage.getItem(USER_KEY);
+  return data ? JSON.parse(data) : null;
+}
+
 function clearAuth() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);

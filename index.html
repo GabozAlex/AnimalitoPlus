@@ -181,6 +181,12 @@
       `;
       document.getElementById('navLinks').innerHTML = navHtml;
       document.getElementById('bottomNav').innerHTML = navHtml;
+
+      const saldo = user.saldo || 0;
+      const balanceEl = document.createElement('span');
+      balanceEl.className = 'header-balance';
+      balanceEl.innerHTML = `<i class="fas fa-coins me-1"></i>Bs ${saldo.toFixed(2)}`;
+      document.querySelector('.main-header').appendChild(balanceEl);
     });
   </script>
 </body>
