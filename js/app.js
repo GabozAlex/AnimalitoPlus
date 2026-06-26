@@ -190,7 +190,7 @@ function validarTelefonoVE(raw) {
 
 function formatPhone(num) {
   if (!num || num.length < 10) return num || '';
-  return num.slice(0, 4) + '-' + num.slice(4);
+  return '0' + num.slice(0, 3) + '-' + num.slice(3);
 }
 
 function normalizeCedula(raw) {
