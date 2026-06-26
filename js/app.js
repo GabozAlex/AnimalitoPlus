@@ -172,7 +172,7 @@ const CASA = {
   banco: 'Banco Mercantil',
   banco_codigo: '0105',
   cedula: '27650586',
-  telefono: '04123656230',
+  telefono: '4123656230',
 };
 
 const MOVIL_PREFIXES = ['412', '414', '416', '424', '426'];
@@ -238,6 +238,9 @@ async function showRechargeModal() {
   const token = getToken();
   if (!token) return;
 
+  const res = await apiFetch('/api/pagos/config/casa');
+  const casa = res.ok ? await res.json() : CASA;
+
   const hoy = new Date().toISOString().split('T')[0];
 
   Swal.fire({
@@ -245,10 +248,10 @@ async function showRechargeModal() {
     html: `
       <div style="text-align:left;font-size:13px;background:#f0fdf4;padding:10px;border-radius:8px;margin-bottom:12px;border:1px solid #bbf7d0;">
         <div class="mb-1 fw-bold text-success"><i class="fas fa-university me-1"></i> Depósito a:</div>
-        <div class="mb-1"><strong>Banco:</strong> ${CASA.banco} (${CASA.banco_codigo})</div>
-        <div class="mb-1"><strong>Titular:</strong> ${CASA.nombre}</div>
-        <div class="mb-1"><strong>Cédula:</strong> ${CASA.cedula}</div>
-        <div class="mb-1"><strong>Teléfono:</strong> ${formatPhone(CASA.telefono)}</div>
+        <div class="mb-1"><strong>Banco:</strong> ${casa.banco} (${casa.banco_codigo})</div>
+        <div class="mb-1"><strong>Titular:</strong> ${casa.nombre}</div>
+        <div class="mb-1"><strong>Cédula:</strong> ${casa.cedula}</div>
+        <div class="mb-1"><strong>Teléfono:</strong> ${formatPhone(casa.telefono)}</div>
       </div>
       <div class="mb-2">
         <label class="form-label">Monto a recargar (Bs) <span class="text-danger">*</span></label>

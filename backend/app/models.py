@@ -107,3 +107,10 @@ class Transaccion(Base):
     created_at = Column(DateTime, default=datetime.now)
 
     usuario = relationship("Usuario", back_populates="transacciones")
+
+
+class Config(Base):
+    __tablename__ = "config"
+
+    clave = Column(String(50), primary_key=True)
+    valor = Column(Text, nullable=False)

@@ -98,3 +98,13 @@ CREATE POLICY apuestas_self ON apuestas
 
 CREATE POLICY transacciones_self ON transacciones
     FOR ALL USING (usuario_id = (SELECT id FROM usuarios WHERE correo = current_user));
+
+-- 8. CONFIGURACION DE LA CASA (banco para recargas)
+CREATE TABLE IF NOT EXISTS config (
+    clave VARCHAR(50) PRIMARY KEY,
+    valor TEXT NOT NULL
+);
+
+INSERT INTO config (clave, valor)
+VALUES ('casa', '{"nombre":"Gabriel Alejandro Rosas Rosas","banco":"Banco Mercantil","banco_codigo":"0105","cedula":"27650586","telefono":"4123656230"}')
+ON CONFLICT (clave) DO NOTHING;

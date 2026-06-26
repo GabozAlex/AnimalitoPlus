@@ -6,7 +6,7 @@ from datetime import date, timedelta, datetime
 import json
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config
 from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, TransaccionOut, AdminPagoUpdate
 from app.auth import require_admin, get_current_user
 
@@ -310,3 +310,41 @@ def cambiar_estado_pago(
     pago.estado = data.estado
     db.commit()
     return {"mensaje": f"Pago marcado como {data.estado}", "tipo": pago.tipo, "monto": pago.monto}
+
+
+# ===== CONFIGURACION DE CASA =====
+
+@router.get("/config/casa")
+def get_config_casa(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'casa').first()
+    if not cfg:
+        return CASA_DEFAULT
+    return json.loads(cfg.valor)
+
+
+@router.put("/config/casa")
+def update_config_casa(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'casa').first()
+    if not cfg:
+        cfg = Config(clave='casa', valor=json.dumps(data))
+        db.add(cfg)
+    else:
+        cfg.valor = json.dumps(data)
+    db.commit()
+    return {"mensaje": "Configuración de casa actualizada"}
+
+
+CASA_DEFAULT = {
+    "nombre": "Gabriel Alejandro Rosas Rosas",
+    "banco": "Banco Mercantil",
+    "banco_codigo": "0105",
+    "cedula": "27650586",
+    "telefono": "4123656230",
+}

@@ -5,7 +5,7 @@ from datetime import date
 import json
 
 from app.database import get_db
-from app.models import Usuario, Transaccion
+from app.models import Usuario, Transaccion, Config
 from app.schemas import RecargaCreate, RetiroCreate, TransaccionOut
 from app.auth import get_current_user
 
@@ -107,3 +107,23 @@ def historial_pagos(
             "usuario_titular": u.pago_movil_titular if u else None,
         })
     return result
+
+
+CASA_DEFAULT = {
+    "nombre": "Gabriel Alejandro Rosas Rosas",
+    "banco": "Banco Mercantil",
+    "banco_codigo": "0105",
+    "cedula": "27650586",
+    "telefono": "4123656230",
+}
+
+
+@router.get("/config/casa")
+def get_config_casa(
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'casa').first()
+    if not cfg:
+        return CASA_DEFAULT
+    return json.loads(cfg.valor)

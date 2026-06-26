@@ -49,6 +49,7 @@
     <a href="#" onclick="showSection('recargas', event)"><i class="fas fa-plus-circle"></i> Recargas</a>
     <a href="#" onclick="showSection('retiros', event)"><i class="fas fa-money-bill-wave"></i> Retiros</a>
     <a href="#" onclick="showSection('reportes', event)"><i class="fas fa-file-invoice"></i> Reportes</a>
+    <a href="#" onclick="showSection('config', event)"><i class="fas fa-cog"></i> Configuración</a>
     <hr style="border-color:rgba(255,255,255,.1);margin:16px 20px;">
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
   </div>
@@ -218,6 +219,40 @@
       </div>
     </div>
 
+    <!-- SECTION: CONFIGURACION -->
+    <div id="sec-config" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-cog me-1 text-secondary"></i> Configuración de Casa</h5>
+      <div class="stat-card">
+        <p class="text-muted mb-3" style="font-size:13px;">Datos de la cuenta bancaria donde los usuarios depositan las recargas.</p>
+        <form id="configForm" onsubmit="guardarConfig(event)">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nombre del titular</label>
+              <input type="text" class="form-control" id="cfgNombre" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Banco</label>
+              <input type="text" class="form-control" id="cfgBanco" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Código del banco</label>
+              <input type="text" class="form-control" id="cfgCodigo" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Cédula</label>
+              <input type="text" class="form-control" id="cfgCedula" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Teléfono</label>
+              <input type="text" class="form-control" id="cfgTelefono" required placeholder="Ej: 4123656230">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-gold mt-3"><i class="fas fa-save me-1"></i> Guardar</button>
+        </form>
+        <div id="configStatus" class="mt-2"></div>
+      </div>
+    </div>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -261,7 +296,7 @@
       if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes' };
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración' };
       document.getElementById('sectionTitle').textContent = titles[name] || name;
       if (name === 'usuarios') cargarUsuarios();
       if (name === 'apuestas') cargarApuestasAdmin();
@@ -269,6 +304,7 @@
       if (name === 'recargas') cargarRecargas();
       if (name === 'retiros') cargarRetiros();
       if (name === 'reportes') cargarReportes();
+      if (name === 'config') cargarConfig();
     }
 
     async function cargarTodo() {
@@ -539,6 +575,44 @@
           Swal.fire('Error', err.detail || 'No se pudo actualizar', 'error');
         }
       } catch(e) { console.error(e); }
+    }
+
+    async function cargarConfig() {
+      try {
+        const res = await fetch(`${API}/api/admin/config/casa`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        document.getElementById('cfgNombre').value = data.nombre || '';
+        document.getElementById('cfgBanco').value = data.banco || '';
+        document.getElementById('cfgCodigo').value = data.banco_codigo || '';
+        document.getElementById('cfgCedula').value = data.cedula || '';
+        document.getElementById('cfgTelefono').value = data.telefono || '';
+      } catch(e) { console.error(e); }
+    }
+
+    async function guardarConfig(e) {
+      e.preventDefault();
+      const data = {
+        nombre: document.getElementById('cfgNombre').value.trim(),
+        banco: document.getElementById('cfgBanco').value.trim(),
+        banco_codigo: document.getElementById('cfgCodigo').value.trim(),
+        cedula: document.getElementById('cfgCedula').value.trim(),
+        telefono: document.getElementById('cfgTelefono').value.trim(),
+      };
+      try {
+        const res = await fetch(`${API}/api/admin/config/casa`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          document.getElementById('configStatus').innerHTML = '<span class="text-success fw-bold"><i class="fas fa-check me-1"></i> Configuración guardada</span>';
+        } else {
+          const err = await res.json();
+          document.getElementById('configStatus').innerHTML = `<span class="text-danger"><i class="fas fa-times me-1"></i> ${err.detail || 'Error'}</span>`;
+        }
+      } catch(e) {
+        document.getElementById('configStatus').innerHTML = '<span class="text-danger">Error de conexión</span>';
+      }
     }
 
     function logout() {
