@@ -23,7 +23,6 @@
       <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
       <a href="admin.html" id="adminLink" x-show="$store.app.user?.rol === 'admin'" x-cloak><i class="fas fa-cog"></i> Admin</a>
       <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus me-1"></i> Recargar</a>
-      <a href="perfil.html"><i class="fas fa-ticket-alt"></i> Tickets</a>
       <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
     <div class="header-balance"><i class="fas fa-wallet me-1"></i> Bs <span id="navBalance" x-text="$store.app.balance.toFixed(2)">0.00</span></div>
