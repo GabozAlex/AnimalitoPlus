@@ -74,6 +74,17 @@ ul { list-style: none; padding: 0; margin: 0; }
 .main-header .nav-links a:hover,
 .main-header .nav-links a.active { color: var(--primary); }
 
+.header-balance {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--gold);
+  white-space: nowrap;
+  margin: 0 8px;
+}
+@media (min-width: 768px) {
+  .header-balance { margin: 0 16px; font-size: 15px; }
+}
+
 /* ===== BOTTOM NAV (mobile) ===== */
 .bottom-nav {
   position: fixed;
@@ -270,50 +281,44 @@ ul { list-style: none; padding: 0; margin: 0; }
 .auth-card .error-msg.show { display: block; }
 .auth-card .is-invalid { border-color: var(--danger) !important; }
 
-/* ===== USER ACTIONS BAR ===== */
-.user-actions-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 16px;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border);
-  font-size: 13px;
-}
-.user-actions-bar .uab-balance {
-  font-weight: 800;
-  font-size: 15px;
-  color: var(--gold);
-}
-.user-actions-bar .uab-links {
-  display: flex;
-  gap: 6px;
-}
-.user-actions-bar .uab-btn {
-  padding: 4px 12px !important;
-  border-radius: 50px !important;
-  font-size: 12px !important;
-  font-weight: 700 !important;
-  border: 2px solid var(--border) !important;
-  background: transparent !important;
-  color: var(--text) !important;
-  cursor: pointer;
-}
-.user-actions-bar .uab-btn:hover {
-  border-color: var(--primary) !important;
-  color: var(--primary) !important;
-}
-
-@media (min-width: 768px) {
-  .user-actions-bar { display: none; }
-}
-
 /* ===== LOTTERY SELECTOR ===== */
 .lottery-selector {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.lottery-card {
+  background: var(--bg-card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all .2s;
+}
+.lottery-card:active { transform: scale(.98); }
+.lottery-card.active {
+  border-color: var(--gold);
+  background: rgba(245,158,11,.08);
+}
+.lottery-card .lottery-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.lottery-card .lottery-name {
+  font-weight: 700;
+  font-size: 14px;
 }
 .lottery-card {
   background: var(--bg-card);
