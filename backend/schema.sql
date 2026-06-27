@@ -1,5 +1,5 @@
 -- =============================================
--- ESQUEMA COMPLETO PARA SUPABASE (PostgreSQL)
+-- ESQUEMA COMPLETO DE BASE DE DATOS (PostgreSQL)
 -- =============================================
 
 -- 1. USUARIOS
@@ -83,23 +83,7 @@ INSERT INTO usuarios (nombre, apellido, correo, clave, rol)
 SELECT 'Admin', 'Principal', 'admin@animalitoplus.com', '$2b$12$RJh.PFrXlCsXF9G2VY8HLeMCU0I03fg5hdjfYh5Ldq/vuJDLBTam6', 'admin'
 WHERE NOT EXISTS (SELECT 1 FROM usuarios WHERE correo = 'admin@animalitoplus.com');
 
--- 7. ROW LEVEL SECURITY (opcional, para seguridad)
-ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
-ALTER TABLE apuestas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE detalle_apuesta ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transacciones ENABLE ROW LEVEL SECURITY;
-
--- Política: usuario solo ve sus propios datos
-CREATE POLICY usuarios_self ON usuarios
-    FOR ALL USING (id = (SELECT id FROM usuarios WHERE correo = current_user));
-
-CREATE POLICY apuestas_self ON apuestas
-    FOR ALL USING (usuario_id = (SELECT id FROM usuarios WHERE correo = current_user));
-
-CREATE POLICY transacciones_self ON transacciones
-    FOR ALL USING (usuario_id = (SELECT id FROM usuarios WHERE correo = current_user));
-
--- 8. CONFIGURACION DE LA CASA (banco para recargas)
+-- 7. CONFIGURACION (banco para recargas, límites, etc.)
 CREATE TABLE IF NOT EXISTS config (
     clave VARCHAR(50) PRIMARY KEY,
     valor TEXT NOT NULL
@@ -109,7 +93,11 @@ INSERT INTO config (clave, valor)
 VALUES ('casa', '{"nombre":"Gabriel Alejandro Rosas Rosas","banco":"Banco Mercantil","banco_codigo":"0105","cedula":"27650586","telefono":"4123656230"}')
 ON CONFLICT (clave) DO NOTHING;
 
--- 9. AUDITORIA
+INSERT INTO config (clave, valor)
+VALUES ('limites', '{"max_por_apuesta":0,"max_por_hora":0,"max_por_dia":0}')
+ON CONFLICT (clave) DO NOTHING;
+
+-- 8. AUDITORIA
 CREATE TABLE IF NOT EXISTS auditoria (
     id BIGSERIAL PRIMARY KEY,
     usuario_id BIGINT REFERENCES usuarios(id),
@@ -122,7 +110,7 @@ CREATE TABLE IF NOT EXISTS auditoria (
 CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id);
 CREATE INDEX idx_auditoria_creado ON auditoria(created_at);
 
--- 10. REFERIDOS
+-- 9. REFERIDOS
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_referido VARCHAR(20) UNIQUE;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS referido_por BIGINT REFERENCES usuarios(id);
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bono_referido BOOLEAN DEFAULT FALSE;
