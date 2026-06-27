@@ -193,6 +193,10 @@ function validarTelefonoVE(raw) {
   return { valido: false, msg: 'Prefijo telefónico inválido para Venezuela' };
 }
 
+function validarCorreo(email) {
+  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
+}
+
 function formatPhone(num) {
   if (!num || num.length < 10) return num || '';
   return '0' + num.slice(0, 3) + '-' + num.slice(3);

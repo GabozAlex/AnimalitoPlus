@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.error-msg').forEach(el => el.classList.remove('show'));
       document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
       if (nombre.length < 3) { showError('regNombre', 'Nombre demasiado corto'); valid = false; }
-      if (correo.length < 3 || !correo.includes('@')) { showError('regUsuario', 'Correo inválido'); valid = false; }
+      if (!validarCorreo(correo)) { showError('regUsuario', 'Correo inválido'); valid = false; }
       if (pass.length < 6) { showError('regPass', 'Mínimo 6 caracteres'); valid = false; }
       if (pass !== pass2) { showError('regPass2', 'No coinciden'); valid = false; }
       const v = validarTelefonoVE(telefono);
