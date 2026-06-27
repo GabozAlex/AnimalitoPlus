@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/style.css">
   <style>[x-cloak]{display:none!important}</style>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="manifest" href="/manifest.json">
 </head>
 <body x-data>
 
@@ -50,6 +51,14 @@
     <div class="stats-card mb-3">
       <h5><i class="fas fa-university me-1 text-gold"></i> Datos Bancarios</h5>
       <div id="datosBancarios">
+        <div class="text-muted text-center py-3">Cargando...</div>
+      </div>
+    </div>
+
+    <!-- CODIGO DE REFERIDO -->
+    <div class="stats-card mb-3">
+      <h5><i class="fas fa-share-alt me-1 text-primary"></i> Código de Referido</h5>
+      <div id="referidoInfo">
         <div class="text-muted text-center py-3">Cargando...</div>
       </div>
     </div>
@@ -129,6 +138,15 @@
         <div class="stat-row"><span>Cédula</span><span class="stat-count">${cedDisplay || '—'}</span></div>
         <div class="stat-row"><span>Banco</span><span class="stat-count">${bancoDisplay}</span></div>
         <div class="stat-row"><span>Saldo</span><span class="stat-count text-gold fw-bold">Bs ${u.saldo.toFixed(2)}</span></div>
+      `;
+
+      // Mostrar código de referido
+      document.getElementById('referidoInfo').innerHTML = `
+        <p class="mb-2" style="font-size:13px;">Comparte tu código y gana <strong>5%</strong> de la primera recarga de tus referidos.</p>
+        <div class="input-group">
+          <input type="text" class="form-control" value="${u.codigo_referido || '—'}" id="codigoReferidoInput" readonly>
+          <button class="btn btn-primary" onclick="copiarReferido()"><i class="fas fa-copy"></i></button>
+        </div>
       `;
 
       const bancosOpts = BANCOS.map(b =>
@@ -266,6 +284,15 @@
           <span class="text-end"><strong class="text-warning">Bs ${r.monto.toFixed(2)}</strong><br>${badge}</span>
         </div>`;
       }).join('');
+    }
+
+    function copiarReferido() {
+      const input = document.getElementById('codigoReferidoInput');
+      if (!input) return;
+      input.select();
+      navigator.clipboard.writeText(input.value).then(() => {
+        Swal.fire({ icon: 'success', title: 'Copiado', text: 'Código copiado al portapapeles', timer: 1500, showConfirmButton: false });
+      }).catch(() => {});
     }
 
   </script>

@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLotterySelector();
   renderHourGrid();
   setupBetAmounts();
+  revisarNovedades();
   document.getElementById('btnPlay')?.addEventListener('click', playBets);
 });
 
@@ -247,4 +248,34 @@ async function playBets() {
   await updateBalanceDisplay();
 
   Swal.fire({ icon: 'success', title: '¡Jugada registrada!', text: `Total: Bs ${total.toFixed(2)}`, timer: 2000, showConfirmButton: false });
+}
+
+async function revisarNovedades() {
+  try {
+    const ultima = localStorage.getItem('ultima_notificacion');
+    let params = '';
+    if (ultima) params = `?desde=${encodeURIComponent(ultima)}`;
+    const r = await apiFetch(`/api/apuestas/novedades${params}`);
+    if (!r.ok) return;
+    const items = await r.json();
+    if (items.length === 0) return;
+    const ganadas = items.filter(i => i.estado === 'ganada');
+    const perdidas = items.filter(i => i.estado === 'perdida');
+    if (ganadas.length > 0) {
+      const totalPremio = ganadas.reduce((s, i) => s + i.premio, 0);
+      Swal.fire({
+        icon: 'success', title: '¡Ganaste!',
+        html: `${ganadas.length} ticket(s) ganador(es)<br><strong>Total: Bs ${totalPremio.toFixed(2)}</strong>`,
+        confirmButtonColor: '#f59e0b',
+      });
+    }
+    if (perdidas.length > 0) {
+      Swal.fire({
+        icon: 'info', title: 'Resultados',
+        text: `${perdidas.length} ticket(s) no resultaron ganadores. ¡Sigue intentando!`,
+        confirmButtonColor: '#0ea5e9',
+      });
+    }
+    localStorage.setItem('ultima_notificacion', new Date().toISOString());
+  } catch(e) { console.error(e); }
 }

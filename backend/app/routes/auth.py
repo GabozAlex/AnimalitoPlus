@@ -1,3 +1,4 @@
+import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -15,6 +16,16 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
     if existe:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
 
+    codigo = secrets.token_hex(3).upper()[:8]
+    while db.query(Usuario).filter(Usuario.codigo_referido == codigo).first():
+        codigo = secrets.token_hex(3).upper()[:8]
+
+    referido_por = None
+    if data.codigo_referido:
+        referido = db.query(Usuario).filter(Usuario.codigo_referido == data.codigo_referido).first()
+        if referido:
+            referido_por = referido.id
+
     usuario = Usuario(
         nombre=data.nombre,
         apellido=data.apellido,
@@ -25,6 +36,8 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
         banco=data.banco,
         banco_codigo=data.banco_codigo,
         pago_movil_titular=data.pago_movil_titular,
+        codigo_referido=codigo,
+        referido_por=referido_por,
     )
     db.add(usuario)
     db.commit()

@@ -48,10 +48,14 @@ class Usuario(Base):
     pago_movil_titular = Column(String(100))
     rol = Column(SAEnum(RolEnum), default=RolEnum.user)
     bloqueado = Column(Boolean, default=False)
+    codigo_referido = Column(String(20), unique=True, index=True)
+    referido_por = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    bono_referido = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.now)
 
     apuestas = relationship("Apuesta", back_populates="usuario")
     transacciones = relationship("Transaccion", back_populates="usuario")
+    referidos = relationship("Usuario", backref="referidor", remote_side=[id])
 
 
 class Apuesta(Base):
@@ -114,3 +118,14 @@ class Config(Base):
 
     clave = Column(String(50), primary_key=True)
     valor = Column(Text, nullable=False)
+
+
+class Auditoria(Base):
+    __tablename__ = "auditoria"
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    accion = Column(String(50), nullable=False)
+    descripcion = Column(Text)
+    ip = Column(String(45))
+    created_at = Column(DateTime, default=datetime.now)

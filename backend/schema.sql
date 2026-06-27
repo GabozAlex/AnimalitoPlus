@@ -108,3 +108,21 @@ CREATE TABLE IF NOT EXISTS config (
 INSERT INTO config (clave, valor)
 VALUES ('casa', '{"nombre":"Gabriel Alejandro Rosas Rosas","banco":"Banco Mercantil","banco_codigo":"0105","cedula":"27650586","telefono":"4123656230"}')
 ON CONFLICT (clave) DO NOTHING;
+
+-- 9. AUDITORIA
+CREATE TABLE IF NOT EXISTS auditoria (
+    id BIGSERIAL PRIMARY KEY,
+    usuario_id BIGINT REFERENCES usuarios(id),
+    accion VARCHAR(50) NOT NULL,
+    descripcion TEXT,
+    ip VARCHAR(45),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id);
+CREATE INDEX idx_auditoria_creado ON auditoria(created_at);
+
+-- 10. REFERIDOS
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_referido VARCHAR(20) UNIQUE;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS referido_por BIGINT REFERENCES usuarios(id);
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bono_referido BOOLEAN DEFAULT FALSE;

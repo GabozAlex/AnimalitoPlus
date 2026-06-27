@@ -1,14 +1,19 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, timedelta, datetime
 import json
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config, Auditoria
 from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, TransaccionOut, AdminPagoUpdate
 from app.auth import require_admin, get_current_user
+
+
+def registrar_auditoria(db: Session, usuario_id: int, accion: str, descripcion: str = None, ip: str = None):
+    db.add(Auditoria(usuario_id=usuario_id, accion=accion, descripcion=descripcion, ip=ip))
+    db.commit()
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -133,14 +138,32 @@ def reporte_semanal(admin: Usuario = Depends(require_admin), db: Session = Depen
 
 # ===== SORTEOS =====
 
+@router.get("/auditoria")
+def listar_auditoria(
+    limit: int = 100,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    logs = db.query(Auditoria).order_by(Auditoria.created_at.desc()).limit(limit).all()
+    return [
+        {
+            "id": l.id,
+            "usuario_id": l.usuario_id,
+            "accion": l.accion,
+            "descripcion": l.descripcion,
+            "ip": l.ip,
+            "created_at": l.created_at.isoformat(),
+        }
+        for l in logs
+    ]
+
+
 @router.post("/resultados")
 def ingresar_resultado(
     data: ResultadoCreate,
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    from app.models import Apuesta as ApuestaModel, DetalleApuesta
-
     fecha = date.fromisoformat(data.fecha) if data.fecha else date.today()
     horario = datetime.strptime(data.horario, "%H:%M").time()
 
@@ -154,42 +177,11 @@ def ingresar_resultado(
     db.add(resultado)
     db.flush()
 
-    # Buscar apuestas ganadoras para esta lotería, fecha y horario
-    apuestas = (
-        db.query(ApuestaModel)
-        .filter(
-            ApuestaModel.loteria == data.loteria,
-            ApuestaModel.fecha == fecha,
-            ApuestaModel.horario == horario,
-            ApuestaModel.estado == "pendiente",
-        )
-        .all()
-    )
-
-    for apuesta in apuestas:
-        ganadora = False
-        for detalle in apuesta.detalles:
-            if detalle.animal_id == data.animal_id:
-                ganadora = True
-                break
-
-        if ganadora:
-            premio = apuesta.total * 30  # multiplicador 30x
-            usuario = db.query(Usuario).filter(Usuario.id == apuesta.usuario_id).first()
-            if usuario:
-                usuario.saldo += premio
-                db.add(Transaccion(
-                    usuario_id=usuario.id,
-                    tipo="pago_premio",
-                    monto=premio,
-                    descripcion=f"Premio {data.loteria} {data.horario}",
-                ))
-            apuesta.estado = "ganada"
-        else:
-            apuesta.estado = "perdida"
-
+    ganadas = procesar_apuestas_por_resultado(db, resultado)
     db.commit()
-    return {"mensaje": "Resultado registrado y apuestas procesadas", "ganadoras": sum(1 for a in apuestas if a.estado == "ganada")}
+    registrar_auditoria(db, admin.id, "resultado_manual",
+        f"{data.loteria} {data.horario} → animal {data.animal_id} ({ganadas} ganadoras)")
+    return {"mensaje": "Resultado registrado y apuestas procesadas", "ganadoras": ganadas}
 
 
 @router.get("/ganadores")
@@ -230,6 +222,42 @@ def listar_ganadores(
     ]
 
 
+MULTIPLICADOR = 30
+
+
+def procesar_apuestas_por_resultado(db: Session, resultado: Resultado):
+    """Marca apuestas pendientes como ganadas/perdidas según un resultado."""
+    apuestas = (
+        db.query(Apuesta)
+        .filter(
+            Apuesta.loteria == resultado.loteria,
+            Apuesta.fecha == resultado.fecha,
+            Apuesta.horario == resultado.horario,
+            Apuesta.estado == "pendiente",
+        )
+        .all()
+    )
+    ganadas = 0
+    for apuesta in apuestas:
+        ganadora = any(d.animal_id == resultado.animal_id for d in apuesta.detalles)
+        if ganadora:
+            premio = apuesta.total * MULTIPLICADOR
+            usuario = db.query(Usuario).filter(Usuario.id == apuesta.usuario_id).first()
+            if usuario:
+                usuario.saldo += premio
+                db.add(Transaccion(
+                    usuario_id=usuario.id,
+                    tipo="pago_premio",
+                    monto=premio,
+                    descripcion=f"Premio {resultado.loteria} {resultado.horario.strftime('%H:%M')}",
+                ))
+            apuesta.estado = "ganada"
+            ganadas += 1
+        else:
+            apuesta.estado = "perdida"
+    return ganadas
+
+
 @router.post("/scraper")
 def trigger_scraper(
     fecha: Optional[str] = None,
@@ -238,8 +266,24 @@ def trigger_scraper(
 ):
     from app.scraper import run_scraper_parallel
 
-    results = run_scraper_parallel(fecha, db)
-    return results
+    scrape_results = run_scraper_parallel(fecha, db)
+    total_ganadas = 0
+    for loteria, info in scrape_results["loterias"].items():
+        resultados = (
+            db.query(Resultado)
+            .filter(
+                Resultado.loteria == loteria,
+                Resultado.fecha == scrape_results["fecha"],
+            )
+            .all()
+        )
+        for r in resultados:
+            total_ganadas += procesar_apuestas_por_resultado(db, r)
+    db.commit()
+    registrar_auditoria(db, admin.id, "scraper",
+        f"Fecha {scrape_results['fecha']}: {scrape_results['total']} resultados, {total_ganadas} apuestas procesadas")
+    scrape_results["apuestas_procesadas"] = total_ganadas
+    return scrape_results
 
 
 # ===== PAGOS / RECARGAS / RETIROS =====
@@ -300,6 +344,19 @@ def cambiar_estado_pago(
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         if pago.tipo == "recarga":
             user.saldo += pago.monto
+            # Bono de referido (5% de la primera recarga)
+            if user.referido_por and not user.bono_referido:
+                referidor = db.query(Usuario).filter(Usuario.id == user.referido_por).first()
+                if referidor:
+                    bono = round(pago.monto * 0.05, 2)
+                    referidor.saldo += bono
+                    db.add(Transaccion(
+                        usuario_id=referidor.id,
+                        tipo="ajuste_admin",
+                        monto=bono,
+                        descripcion=f"Bono referido {user.correo} ({pago.monto:.2f})",
+                    ))
+                    user.bono_referido = True
         elif pago.tipo == "retiro":
             if pago.monto > user.saldo:
                 raise HTTPException(status_code=400, detail="Saldo insuficiente")
@@ -348,3 +405,32 @@ CASA_DEFAULT = {
     "cedula": "27650586",
     "telefono": "4123656230",
 }
+
+
+# ===== CONFIGURACION DE LIMITES =====
+
+@router.get("/config/limites")
+def get_config_limites(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'limites').first()
+    if not cfg:
+        return {"max_por_apuesta": 0, "max_por_hora": 0, "max_por_dia": 0}
+    return json.loads(cfg.valor)
+
+
+@router.put("/config/limites")
+def update_config_limites(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'limites').first()
+    if not cfg:
+        cfg = Config(clave='limites', valor=json.dumps(data))
+        db.add(cfg)
+    else:
+        cfg.valor = json.dumps(data)
+    db.commit()
+    return {"mensaje": "Límites actualizados"}

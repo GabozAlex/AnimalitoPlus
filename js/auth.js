@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const pass = document.getElementById('regPass').value;
       const pass2 = document.getElementById('regPass2').value;
       const telefono = document.getElementById('regTelefono').value.trim();
+      const codigoReferido = document.getElementById('regReferido')?.value.trim() || '';
       let valid = true;
       document.querySelectorAll('.error-msg').forEach(el => el.classList.remove('show'));
       document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
@@ -18,9 +19,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const v = validarTelefonoVE(telefono);
       if (!v.valido) { showError('regTelefono', v.msg); valid = false; }
       if (!valid) return;
+      const body = { nombre, apellido: '', correo, clave: pass, telefono: normalizePhone(telefono) };
+      if (codigoReferido) body.codigo_referido = codigoReferido;
       const res = await apiFetch('/api/auth/register', {
         method: 'POST',
-        body: JSON.stringify({ nombre, apellido: '', correo, clave: pass, telefono: normalizePhone(telefono) }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json();

@@ -16,6 +16,7 @@ class UsuarioCreate(BaseModel):
     banco: Optional[str] = None
     banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
+    codigo_referido: Optional[str] = None
 
 
 class UsuarioLogin(BaseModel):
@@ -36,6 +37,9 @@ class UsuarioOut(BaseModel):
     pago_movil_titular: Optional[str] = None
     rol: str
     bloqueado: bool
+    codigo_referido: Optional[str] = None
+    referido_por: Optional[int] = None
+    bono_referido: Optional[bool] = False
 
     class Config:
         from_attributes = True

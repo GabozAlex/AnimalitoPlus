@@ -36,6 +36,7 @@
     }
   </style>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐾</text></svg>">
+  <link rel="manifest" href="/manifest.json">
 </head>
 <body>
 
@@ -50,6 +51,8 @@
     <a href="#" onclick="showSection('retiros', event)"><i class="fas fa-money-bill-wave"></i> Retiros</a>
     <a href="#" onclick="showSection('reportes', event)"><i class="fas fa-file-invoice"></i> Reportes</a>
     <a href="#" onclick="showSection('config', event)"><i class="fas fa-cog"></i> Configuración</a>
+    <a href="#" onclick="showSection('referidos', event)"><i class="fas fa-share-alt"></i> Referidos</a>
+    <a href="#" onclick="showSection('auditoria', event)"><i class="fas fa-history"></i> Auditoría</a>
     <hr style="border-color:rgba(255,255,255,.1);margin:16px 20px;">
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
   </div>
@@ -130,6 +133,7 @@
     <!-- SECTION: RESULTADOS -->
     <div id="sec-resultados" class="section-admin d-none">
       <h5 class="fw-bold mb-3"><i class="fas fa-list me-1 text-primary"></i> Ingresar resultado</h5>
+      <button class="btn btn-sm btn-primary mb-2" onclick="ejecutarScraper()"><i class="fas fa-robot me-1"></i> Scraper automático</button>
       <div class="stat-card mb-3">
         <form id="resultadoForm" onsubmit="ingresarResultado(event)">
           <div class="row g-2">
@@ -251,6 +255,52 @@
         </form>
         <div id="configStatus" class="mt-2"></div>
       </div>
+
+      <div class="stat-card mt-3">
+        <h6 class="fw-bold mb-3"><i class="fas fa-ban me-1 text-danger"></i> Límites de apuesta</h6>
+        <p class="text-muted" style="font-size:12px;">0 = sin límite</p>
+        <div class="row g-2">
+          <div class="col-4">
+            <label class="form-label" style="font-size:12px;">Max por apuesta</label>
+            <input type="number" class="form-control form-control-sm" id="limApuesta" min="0" step="1" placeholder="0">
+          </div>
+          <div class="col-4">
+            <label class="form-label" style="font-size:12px;">Max por hora</label>
+            <input type="number" class="form-control form-control-sm" id="limHora" min="0" step="1" placeholder="0">
+          </div>
+          <div class="col-4">
+            <label class="form-label" style="font-size:12px;">Max por día</label>
+            <input type="number" class="form-control form-control-sm" id="limDia" min="0" step="1" placeholder="0">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-gold mt-2" onclick="guardarLimites()"><i class="fas fa-save me-1"></i> Guardar límites</button>
+      </div>
+    </div>
+
+    <!-- SECTION: REFERIDOS -->
+    <div id="sec-referidos" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-share-alt me-1 text-primary"></i> Referidos</h5>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0">
+            <thead><tr><th>Usuario</th><th>Código</th><th>Referidos</th><th>Bono pagado</th></tr></thead>
+            <tbody id="referidosTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: AUDITORIA -->
+    <div id="sec-auditoria" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-history me-1 text-primary"></i> Auditoría</h5>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0" style="font-size:12px;">
+            <thead><tr><th>ID</th><th>Usuario</th><th>Acción</th><th>Descripción</th><th>Fecha</th></tr></thead>
+            <tbody id="auditoriaTable"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </div>
@@ -296,7 +346,7 @@
       if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración' };
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración', referidos: 'Referidos', auditoria: 'Auditoría' };
       document.getElementById('sectionTitle').textContent = titles[name] || name;
       if (name === 'usuarios') cargarUsuarios();
       if (name === 'apuestas') cargarApuestasAdmin();
@@ -305,6 +355,8 @@
       if (name === 'retiros') cargarRetiros();
       if (name === 'reportes') cargarReportes();
       if (name === 'config') cargarConfig();
+      if (name === 'referidos') cargarReferidosAdmin();
+      if (name === 'auditoria') cargarAuditoria();
     }
 
     async function cargarTodo() {
@@ -588,6 +640,31 @@
         document.getElementById('cfgCedula').value = data.cedula || '';
         document.getElementById('cfgTelefono').value = data.telefono || '';
       } catch(e) { console.error(e); }
+      try {
+        const res2 = await fetch(`${API}/api/admin/config/limites`, { headers: getHeaders() });
+        if (res2.ok) {
+          const lim = await res2.json();
+          document.getElementById('limApuesta').value = lim.max_por_apuesta || 0;
+          document.getElementById('limHora').value = lim.max_por_hora || 0;
+          document.getElementById('limDia').value = lim.max_por_dia || 0;
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    async function guardarLimites() {
+      const data = {
+        max_por_apuesta: parseFloat(document.getElementById('limApuesta').value) || 0,
+        max_por_hora: parseFloat(document.getElementById('limHora').value) || 0,
+        max_por_dia: parseFloat(document.getElementById('limDia').value) || 0,
+      };
+      try {
+        const res = await fetch(`${API}/api/admin/config/limites`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify(data),
+        });
+        if (res.ok) Swal.fire('Listo', 'Límites guardados', 'success');
+        else Swal.fire('Error', 'No se pudieron guardar', 'error');
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
     }
 
     async function guardarConfig(e) {
@@ -613,6 +690,57 @@
       } catch(e) {
         document.getElementById('configStatus').innerHTML = '<span class="text-danger">Error de conexión</span>';
       }
+    }
+
+    async function ejecutarScraper() {
+      try {
+        const res = await fetch(`${API}/api/admin/scraper`, { method: 'POST', headers: getHeaders() });
+        if (!res.ok) { Swal.fire('Error', 'No se pudo ejecutar el scraper', 'error'); return; }
+        const data = await res.json();
+        Swal.fire('Scraper ejecutado', `${data.total} resultados guardados, ${data.apuestas_procesadas || 0} apuestas procesadas`, 'success');
+        cargarResultadosAdmin();
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+    }
+
+    async function cargarReferidosAdmin() {
+      try {
+        const res = await fetch(`${API}/api/admin/usuarios`, { headers: getHeaders() });
+        const usuarios = await res.json();
+        const tbody = document.getElementById('referidosTable');
+        const conCodigo = usuarios.filter(u => u.codigo_referido);
+        if (conCodigo.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">Sin códigos de referido</td></tr>';
+          return;
+        }
+        tbody.innerHTML = conCodigo.map(u => {
+          const referidos = usuarios.filter(r => r.referido_por === u.id);
+          return `<tr>
+            <td>${u.nombre} ${u.apellido}</td>
+            <td><code>${u.codigo_referido}</code></td>
+            <td>${referidos.length}</td>
+            <td>${u.bono_referido ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+          </tr>`;
+        }).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function cargarAuditoria() {
+      try {
+        const res = await fetch(`${API}/api/admin/auditoria?limit=100`, { headers: getHeaders() });
+        const logs = await res.json();
+        const tbody = document.getElementById('auditoriaTable');
+        if (logs.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">Sin registros</td></tr>';
+          return;
+        }
+        tbody.innerHTML = logs.map(l => `<tr>
+          <td>${l.id}</td>
+          <td>${l.usuario_id || '—'}</td>
+          <td><span class="badge bg-primary">${l.accion}</span></td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${l.descripcion || '—'}</td>
+          <td style="white-space:nowrap;">${new Date(l.created_at).toLocaleString()}</td>
+        </tr>`).join('');
+      } catch(e) { console.error(e); }
     }
 
     function logout() {
