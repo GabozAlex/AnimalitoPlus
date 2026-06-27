@@ -4,9 +4,9 @@ let selectedHorario = null;
 const betSlip = {};
 
 const LOTERIAS = [
-  { key: 'lotto_activo', nombre: 'Lotto Activo', icono: 'fa-lion', color: '#0ea5e9' },
-  { key: 'la_granjita', nombre: 'La Granjita', icono: 'fa-egg', color: '#22c55e' },
-  { key: 'selvaplus', nombre: 'Selva Plus', icono: 'fa-hippo', color: '#f59e0b' },
+  { key: 'lotto_activo', nombre: 'Lotto Activo', icono: 'fa-lion', logo: 'img/loterias/lotto_activo.webp', color: '#0ea5e9' },
+  { key: 'la_granjita', nombre: 'La Granjita', icono: 'fa-egg', logo: 'img/loterias/la_granjita.webp', color: '#22c55e' },
+  { key: 'selvaplus', nombre: 'Selva Plus', icono: 'fa-hippo', logo: 'img/loterias/selvaplus.webp', color: '#f59e0b' },
 ];
 
 const HORARIOS = [
@@ -41,17 +41,24 @@ function renderLotterySelector() {
   if (!container) return;
   container.innerHTML = LOTERIAS.map(l => `
     <div class="lottery-card ${selectedLoteria === l.key ? 'active' : ''}" data-loteria="${l.key}" onclick="selectLoteria('${l.key}')">
-      <div class="lottery-icon" style="background:${l.color}20;color:${l.color};"><i class="fas ${l.icono}"></i></div>
+      <img src="${l.logo}" alt="${l.nombre}" class="lottery-logo" loading="lazy">
       <div class="lottery-name">${l.nombre}</div>
     </div>
   `).join('');
 }
 
 function selectLoteria(key) {
+  if (Object.keys(betSlip).length > 0) {
+    Swal.fire('Ticket pendiente', 'Debes culminar el ticket actual antes de cambiar de lotería', 'warning');
+    return;
+  }
   selectedLoteria = key;
+  selectedHorario = null;
   document.querySelectorAll('.lottery-card').forEach(el => {
     el.classList.toggle('active', el.dataset.loteria === key);
   });
+  renderHourGrid();
+  renderAnimalGrid();
 }
 
 function renderHourGrid() {
@@ -75,6 +82,10 @@ function renderHourGrid() {
 }
 
 function selectHorario(h) {
+  if (Object.keys(betSlip).length > 0) {
+    Swal.fire('Ticket pendiente', 'Debes culminar el ticket actual antes de cambiar de horario', 'warning');
+    return;
+  }
   selectedHorario = h;
   document.querySelectorAll('.hour-item').forEach(el => {
     el.classList.toggle('active', el.dataset.horario === h);
@@ -84,14 +95,17 @@ function selectHorario(h) {
 function renderAnimalGrid() {
   const grid = document.getElementById('animalGrid');
   if (!grid) return;
-  grid.innerHTML = ANIMALES.map(a => `
+  const imgFolder = LOTTERY_IMAGE_FOLDER[selectedLoteria] || 'lotto_activo';
+  grid.innerHTML = ANIMALES.map(a => {
+    const imgName = a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase();
+    return `
     <div class="animal-item" data-id="${a.id}" onclick="toggleAnimal('${a.id}')">
-      <i class="fas ${a.icono} animal-icon"></i>
+      <img src="img/animales/${imgFolder}/${imgName}.webp" alt="${a.nombre}" class="animal-img" loading="lazy">
       <div class="animal-number">${String(a.id).padStart(2, '0')}</div>
       <div class="animal-name">${a.nombre}</div>
       <div class="bet-badge" id="badge-${a.id}"></div>
     </div>
-  `).join('');
+  `}).join('');
 }
 
 function toggleAnimal(id) {
@@ -134,7 +148,7 @@ function renderBetSlip() {
     total += e.monto;
     return `
       <div class="comanda-item">
-        <span><i class="fas ${animal.icono} me-1"></i> ${animal.nombre} #${String(e.id).padStart(2, '0')}</span>
+        <span>${animal.nombre} #${String(e.id).padStart(2, '0')}</span>
         <span><strong>Bs ${e.monto.toFixed(2)}</strong> <i class="fas fa-times text-danger ms-2" style="cursor:pointer;" onclick="removeBet(${e.id})"></i></span>
       </div>
     `;
@@ -174,6 +188,39 @@ async function playBets() {
       return;
     }
   }
+
+  const loteriaNom = LOTERIAS.find(l => l.key === selectedLoteria)?.nombre || selectedLoteria;
+  const imgFolder = LOTTERY_IMAGE_FOLDER[selectedLoteria] || 'lotto_activo';
+  const animalListHtml = entries.map(e => {
+    const a = ANIMALES.find(x => String(x.id) === String(e.id));
+    const imgName = a ? a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase() : '';
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:14px;">
+      <span>${imgName ? `<img src="img/animales/${imgFolder}/${imgName}.webp" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;">` : ''}${a ? a.nombre : e.id} #${String(e.id).padStart(2, '0')}</span>
+      <strong>Bs ${e.monto.toFixed(2)}</strong>
+    </div>`;
+  }).join('');
+
+  const confirm = await Swal.fire({
+    title: 'Confirmar jugada',
+    html: `
+      <div style="text-align:left;font-size:14px;">
+        <p><strong>Lotería:</strong> ${loteriaNom}</p>
+        <p><strong>Horario:</strong> ${selectedHorario}</p>
+        <hr style="margin:8px 0;">
+        ${animalListHtml}
+        <hr style="margin:8px 0;">
+        <div style="display:flex;justify-content:space-between;font-size:16px;">
+          <strong>Total</strong>
+          <strong style="color:var(--primary);">Bs ${total.toFixed(2)}</strong>
+        </div>
+      </div>
+    `,
+    showCancelButton: true,
+    confirmButtonText: '<i class="fas fa-check me-1"></i> Confirmar',
+    cancelButtonText: 'Cancelar',
+    confirmButtonColor: '#f59e0b',
+  });
+  if (!confirm.isConfirmed) return;
 
   Swal.fire({ title: 'Procesando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 

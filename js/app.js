@@ -5,6 +5,23 @@ const API_BASE = (window.location.hostname === 'localhost' || window.location.ho
 const TOKEN_KEY = 'animalito_token';
 const USER_KEY = 'animalito_user';
 
+const LOTTERY_IMAGE_FOLDER = {
+  lotto_activo: 'lotto_activo',
+  la_granjita: 'la_granjita',
+  selvaplus: 'selvaplus',
+};
+const LOTTERY_LOGO = {
+  lotto_activo: 'img/loterias/lotto_activo.webp',
+  la_granjita: 'img/loterias/la_granjita.webp',
+  selvaplus: 'img/loterias/selvaplus.webp',
+};
+function animalImg(loteria, animalId) {
+  const folder = LOTTERY_IMAGE_FOLDER[loteria] || 'lotto_activo';
+  const a = ANIMALES.find(x => String(x.id) === String(animalId));
+  if (!a) return '';
+  return `img/animales/${folder}/${a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase()}.webp`;
+}
+
 function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -83,10 +100,12 @@ async function renderResults(fecha, loteria) {
   container.innerHTML = '<tr><td colspan="3" class="text-center text-success py-2"><small>✅ Resultados actualizados</small></td></tr>' +
     data.resultados.map(r => {
       const animal = ANIMALES.find(a => String(a.id) === r.animal_id);
+      const loteriaKey = r.loteria || loteria;
+      const imgSrc = animal ? animalImg(loteriaKey, r.animal_id) : '';
       return `
       <tr>
         <td>${r.horario}</td>
-        <td><div class="animal-cell"><i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i> ${animal ? animal.nombre : r.animal_id}</div></td>
+        <td><div class="animal-cell">${imgSrc ? `<img src="${imgSrc}" alt="${animal.nombre}" loading="lazy">` : `<i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i>`} ${animal ? animal.nombre : r.animal_id}</div></td>
         <td class="num-cell">${r.numero}</td>
       </tr>
     `;
@@ -313,12 +332,24 @@ async function showRechargeModal() {
 async function showWithdrawModal() {
   const token = getToken();
   if (!token) return;
+  let saldoActual = 0;
+  try {
+    const r = await apiFetch('/api/auth/balance');
+    if (r.ok) {
+      const b = await r.json();
+      saldoActual = b.saldo || 0;
+    }
+  } catch(e) {}
   Swal.fire({
     title: 'Retirar saldo',
     html: `
+      <div class="mb-2 text-center">
+        <small class="text-muted">Saldo disponible</small><br>
+        <strong style="font-size:1.4rem;color:var(--gold);">Bs ${saldoActual.toFixed(2)}</strong>
+      </div>
       <div class="mb-3">
         <label class="form-label">Monto a retirar (Bs)</label>
-        <input type="number" id="swal-withdraw" class="form-control" min="1" step="0.5" placeholder="Ej: 20">
+        <input type="number" id="swal-withdraw" class="form-control" min="1" max="${saldoActual}" step="0.5" placeholder="Ej: 20">
       </div>
     `,
     showCancelButton: true,
@@ -328,6 +359,7 @@ async function showWithdrawModal() {
     preConfirm: () => {
       const val = parseFloat(document.getElementById('swal-withdraw').value);
       if (!val || val <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
+      if (val > saldoActual) { Swal.showValidationMessage(`El monto no puede exceder tu saldo de Bs ${saldoActual.toFixed(2)}`); return false; }
       return val;
     }
   }).then(async res => {
@@ -339,9 +371,12 @@ async function showWithdrawModal() {
     if (r.ok) {
       await updateBalanceDisplay();
       Swal.fire('¡Listo!', `Solicitud de retiro de Bs ${res.value.toFixed(2)} registrada`, 'success');
+      // recargar historial si estamos en perfil
+      if (typeof cargarRetiros === 'function') cargarRetiros();
     } else {
-      const err = await r.json();
-      Swal.fire('Error', err.detail || 'Saldo insuficiente', 'error');
+      let msg = 'Error al procesar la solicitud';
+      try { const err = await r.json(); msg = err.detail || msg; } catch(e) {}
+      Swal.fire('Error', msg, 'error');
     }
   });
 }

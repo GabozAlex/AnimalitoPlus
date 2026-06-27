@@ -20,9 +20,11 @@
       <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
       <a href="tickets.html"><i class="fas fa-ticket"></i> Tickets</a>
       <a href="resultados.html" class="active"><i class="fas fa-list"></i> Resultados</a>
-      <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
+      <a href="datos.html"><i class="fas fa-trophy"></i> Ganadores</a>
       <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
+      <a href="admin.html" id="adminLink" style="display:none;"><i class="fas fa-cog"></i> Admin</a>
       <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus me-1"></i> Recargar</a>
+      <a href="#" onclick="showWithdrawModal()"><i class="fas fa-upload me-1"></i> Retirar</a>
       <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
     <div class="header-balance"><i class="fas fa-wallet me-1"></i> Bs <span id="navBalance">0.00</span></div>
@@ -44,10 +46,10 @@
         <option value="selvaplus">Selva Plus</option>
       </select>
     </div>
-  </div>
-  <div class="date-picker">
-    <input type="date" id="datePicker">
-    <button class="btn btn-gold btn-sm" onclick="filterResults()"><i class="fas fa-search"></i></button>
+    <div class="date-picker" style="padding:0;">
+      <input type="date" id="datePicker">
+      <button class="btn btn-gold btn-sm" onclick="filterResults()"><i class="fas fa-search"></i></button>
+    </div>
   </div>
 
   <!-- TABLE -->
@@ -73,9 +75,10 @@
     <a href="dashboard.html"><i class="fas fa-gamepad"></i> Jugar</a>
     <a href="tickets.html"><i class="fas fa-ticket"></i> Tickets</a>
     <a href="resultados.html" class="active"><i class="fas fa-list"></i> Resultados</a>
-    <a href="datos.html"><i class="fas fa-chart-bar"></i> Estadísticas</a>
-    <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
-    <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus-circle"></i> Recargar</a>
+    <a href="datos.html"><i class="fas fa-trophy"></i> Ganadores</a>
+      <a href="#" onclick="showRechargeModal()"><i class="fas fa-plus-circle"></i> Recargar</a>
+      <a href="#" onclick="showWithdrawModal()"><i class="fas fa-upload"></i> Retirar</a>
+      <a href="perfil.html"><i class="fas fa-user"></i> Perfil</a>
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
   </nav>
 
@@ -87,6 +90,11 @@
       const token = requireAuth();
       if (!token) return;
       await updateBalanceDisplay();
+      const adminLink = document.getElementById('adminLink');
+      if (adminLink) {
+        const u = getUser();
+        if (u && u.rol === 'admin') adminLink.style.display = '';
+      }
       const picker = document.getElementById('datePicker');
       if (picker) {
         picker.valueAsDate = new Date();

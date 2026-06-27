@@ -97,10 +97,17 @@ ul { list-style: none; padding: 0; margin: 0; }
   border-top: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: flex-start;
   z-index: 200;
   padding: 0 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  flex-wrap: nowrap;
+  gap: 0;
 }
+.bottom-nav::-webkit-scrollbar { display: none; }
 .bottom-nav a {
   display: flex;
   flex-direction: column;
@@ -112,6 +119,7 @@ ul { list-style: none; padding: 0; margin: 0; }
   border-radius: 8px;
   transition: all .2s;
   min-width: 52px;
+  flex-shrink: 0;
 }
 .bottom-nav a i { font-size: 18px; }
 .bottom-nav a.active,
@@ -331,6 +339,15 @@ ul { list-style: none; padding: 0; margin: 0; }
   flex-shrink: 0;
   transition: transform .2s;
 }
+.lottery-card .lottery-logo {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 8px;
+  flex-shrink: 0;
+  transition: transform .2s;
+}
+.lottery-card.active .lottery-logo { transform: scale(1.1); }
 .lottery-card.active .lottery-icon { transform: scale(1.1); }
 .lottery-card .lottery-name {
   font-weight: 700;
@@ -446,6 +463,23 @@ ul { list-style: none; padding: 0; margin: 0; }
   display: block;
   margin-bottom: 2px;
 }
+.animal-grid .animal-item .animal-img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 2px;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+.animal-grid .animal-item.selected .animal-img { transform: scale(1.15); }
+.animal-grid .animal-item .animal-img-sm {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  border-radius: 50%;
+  vertical-align: middle;
+}
 .animal-grid .animal-item .animal-number {
   font-size: 12px;
   font-weight: 700;
@@ -542,6 +576,7 @@ ul { list-style: none; padding: 0; margin: 0; }
 .table-custom tr td:last-child { border-radius: 0 var(--radius-sm) var(--radius-sm) 0; }
 .table-custom .animal-cell { display: flex; align-items: center; gap: 8px; }
 .table-custom .animal-cell i { font-size: 20px; }
+.table-custom .animal-cell img { width: 28px; height: 28px; object-fit: contain; border-radius: 50%; }
 .table-custom .num-cell { font-weight: 800; font-size: 16px; color: var(--primary); }
 
 /* Stats cards */
