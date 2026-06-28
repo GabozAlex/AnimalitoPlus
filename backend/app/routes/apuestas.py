@@ -1,13 +1,16 @@
+from decimal import Decimal
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, datetime
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Cupo, AcumuladoCupo
 from app.schemas import ApuestaCreate, ApuestaOut
 from app.auth import get_current_user
+from app.routes.admin import get_multiplicador
 
 router = APIRouter(prefix="/api/apuestas", tags=["apuestas"])
 
@@ -21,7 +24,9 @@ def crear_apuesta(
     if user.bloqueado:
         raise HTTPException(status_code=403, detail="Usuario bloqueado")
 
-    total = sum(a.monto for a in data.animales)
+    total = Decimal(str(sum(a.monto for a in data.animales)))
+    db.refresh(user)
+    user = db.query(Usuario).filter(Usuario.id == user.id).with_for_update().first()
     if total > user.saldo:
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
 
@@ -71,6 +76,47 @@ def crear_apuesta(
         except (json.JSONDecodeError, ValueError):
             pass
 
+    # Validar cupos por animal
+    hoy = date.today()
+    for det in data.animales:
+        cupo = db.query(Cupo).filter(
+            Cupo.loteria == data.loteria,
+            Cupo.horario == horario,
+            Cupo.animal_id == str(det.animal_id),
+            Cupo.activo == True,
+        ).first()
+        if cupo and cupo.maximo > 0:
+            ac = db.query(AcumuladoCupo).filter(
+                AcumuladoCupo.fecha == hoy,
+                AcumuladoCupo.loteria == data.loteria,
+                AcumuladoCupo.horario == horario,
+                AcumuladoCupo.animal_id == str(det.animal_id),
+            ).with_for_update().first()
+            if not ac:
+                ac = AcumuladoCupo(
+                    fecha=hoy,
+                    loteria=data.loteria,
+                    horario=horario,
+                    animal_id=str(det.animal_id),
+                    acumulado=0,
+                )
+                db.add(ac)
+            nuevo_acumulado = float(ac.acumulado) + det.monto
+            if nuevo_acumulado > float(cupo.maximo):
+                animal_nombre = "?"
+                try:
+                    from app.models import Animal
+                    animal_db = db.query(Animal).filter(Animal.id == str(det.animal_id)).first()
+                    if animal_db:
+                        animal_nombre = animal_db.nombre
+                except Exception:
+                    pass
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Límite alcanzado para {animal_nombre} #{det.animal_id} en {data.loteria} {data.horario} (máx: Bs {float(cupo.maximo):.2f})",
+                )
+            ac.acumulado = nuevo_acumulado
+
     # Descontar saldo
     user.saldo -= total
 
@@ -83,6 +129,13 @@ def crear_apuesta(
         horario=horario,
     )
     db.add(apuesta)
+    db.flush()
+
+    # Generar folio único
+    fecha_str = date.today().strftime("%y%m%d")
+    PREFIJOS = {"lotto_activo": "LOT", "la_granjita": "GRA", "selvaplus": "SEL"}
+    prefijo = PREFIJOS.get(data.loteria, data.loteria[:3].upper())
+    apuesta.folio = f"{fecha_str}-{prefijo}-{apuesta.id}"
     db.flush()
 
     # Crear detalles
@@ -118,7 +171,10 @@ def listar_apuestas(
     if loteria:
         query = query.filter(Apuesta.loteria == loteria)
     if fecha:
-        query = query.filter(Apuesta.fecha == date.fromisoformat(fecha))
+        try:
+            query = query.filter(Apuesta.fecha == date.fromisoformat(fecha))
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Fecha inválida")
     apuestas = (
         query
         .order_by(Apuesta.created_at.desc())
@@ -143,8 +199,9 @@ def novedades_apuestas(
             dt = datetime.fromisoformat(desde)
             query = query.filter(Apuesta.created_at > dt)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="Fecha inválida")
     apuestas = query.order_by(Apuesta.created_at.desc()).limit(20).all()
+    mult = get_multiplicador(db)
     return [
         {
             "id": a.id,
@@ -153,7 +210,7 @@ def novedades_apuestas(
             "horario": a.horario.strftime("%H:%M"),
             "fecha": a.fecha.isoformat(),
             "estado": a.estado,
-            "premio": a.total * 30 if a.estado == "ganada" else 0,
+            "premio": a.total * mult if a.estado == "ganada" else 0,
         }
         for a in apuestas
     ]
@@ -171,3 +228,118 @@ def detalle_apuesta(
     if apuesta.usuario_id != user.id and user.rol != "admin":
         raise HTTPException(status_code=403, detail="No tienes acceso a esta apuesta")
     return apuesta
+
+
+@router.get("/{apuesta_id}/ticket", response_class=HTMLResponse)
+def ticket_apuesta(
+    apuesta_id: int,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    apuesta = db.query(Apuesta).filter(Apuesta.id == apuesta_id).first()
+    if not apuesta:
+        raise HTTPException(status_code=404, detail="Apuesta no encontrada")
+    if apuesta.usuario_id != user.id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    loteria_nombre = apuesta.loteria.replace("_", " ").title()
+    estado_class = {"pendiente": "Pendiente", "ganada": "Ganada", "perdida": "Perdida"}
+    estado_txt = estado_class.get(apuesta.estado, apuesta.estado)
+
+    detalles_html = ""
+    nombres = {}
+    from app.models import Animal
+    animales = db.query(Animal).all()
+    for a in animales:
+        nombres[a.id] = a.nombre
+
+    from app.animales import ANIMALES_HARDCODE
+    for a in ANIMALES_HARDCODE:
+        if a["id"] not in nombres:
+            nombres[a["id"]] = a.get("nombre", "")
+
+    for d in apuesta.detalles:
+        nom = nombres.get(d.animal_id, d.animal_id)
+        clase_estado = ""
+        if apuesta.estado in ("ganada", "perdida"):
+            for dr in apuesta.detalles:
+                if dr.animal_id == d.animal_id:
+                    from app.models import Resultado
+                    res = db.query(Resultado).filter(
+                        Resultado.loteria == apuesta.loteria,
+                        Resultado.fecha == apuesta.fecha,
+                        Resultado.horario == apuesta.horario,
+                        Resultado.animal_id == d.animal_id,
+                    ).first()
+                    if res:
+                        clase_estado = "ganador" if apuesta.estado == "ganada" else "perdedor"
+                    break
+        detalles_html += f"""
+        <tr class="{clase_estado}">
+            <td>{d.animal_id}</td>
+            <td>{nom}</td>
+            <td class="monto">Bs {float(d.monto):.2f}</td>
+        </tr>"""
+
+    premio_html = ""
+    if apuesta.estado == "ganada":
+        from app.routes.admin import procesar_apuestas_por_resultado
+        total_premio = sum(float(d.monto) * 30 for d in apuesta.detalles)
+        premio_html = f"""
+        <div class="premio">
+            <strong>¡GANASTE!</strong> Premio: Bs {total_premio:.2f}
+        </div>"""
+
+    html = f"""<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Ticket #{apuesta.folio or apuesta.id}</title>
+<style>
+    @page {{ margin: 10mm; size: 80mm 200mm; }}
+    * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+    body {{ font-family: 'Courier New', monospace; font-size: 12px; width: 70mm; margin: auto; padding: 10px; }}
+    h2 {{ text-align: center; font-size: 16px; margin-bottom: 4px; }}
+    .folio {{ text-align: center; font-size: 10px; color: #666; margin-bottom: 12px; }}
+    .info {{ width: 100%; margin-bottom: 10px; }}
+    .info td {{ padding: 2px 4px; }}
+    .info td:last-child {{ text-align: right; }}
+    table.detalles {{ width: 100%; border-collapse: collapse; margin-bottom: 10px; }}
+    table.detalles th {{ border-bottom: 1px dashed #333; padding: 4px; text-align: left; font-size: 11px; }}
+    table.detalles td {{ padding: 4px; border-bottom: 1px dotted #ccc; }}
+    .monto {{ text-align: right; }}
+    .total {{ text-align: right; font-weight: bold; font-size: 14px; margin-bottom: 10px; }}
+    .estado {{ text-align: center; font-weight: bold; font-size: 14px; padding: 6px; border: 1px solid #333; margin-bottom: 10px; }}
+    .premio {{ text-align: center; font-weight: bold; font-size: 16px; color: #2e7d32; padding: 8px; border: 2px solid #2e7d32; margin-bottom: 10px; }}
+    .footer {{ text-align: center; font-size: 9px; color: #999; margin-top: 10px; }}
+    .ganador {{ background: #e8f5e9; }}
+    .perdedor {{ background: #ffebee; }}
+    @media print {{
+        body {{ width: 100%; }}
+        .no-print {{ display: none; }}
+    }}
+    .no-print {{ text-align: center; margin: 20px 0; }}
+    .no-print button {{ padding: 8px 24px; font-size: 14px; cursor: pointer; }}
+</style>
+</head>
+<body>
+    <h2>🏆 AnimalitoPlus</h2>
+    <div class="folio">Folio: {apuesta.folio or 'N/A'}</div>
+    <table class="info">
+        <tr><td>Fecha</td><td>{apuesta.fecha.isoformat()}</td></tr>
+        <tr><td>Hora</td><td>{apuesta.horario.strftime('%H:%M')}</td></tr>
+        <tr><td>Lotería</td><td>{loteria_nombre}</td></tr>
+        <tr><td>Usuario</td><td>{user.nombre}</td></tr>
+    </table>
+    <table class="detalles">
+        <thead><tr><th>#</th><th>Animal</th><th>Monto</th></tr></thead>
+        <tbody>{detalles_html}</tbody>
+    </table>
+    <div class="total">Total: Bs {float(apuesta.total):.2f}</div>
+    <div class="estado">{estado_txt}</div>
+    {premio_html}
+    <div class="footer">Ticket generado el {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>
+    <div class="no-print"><button onclick="window.print()">🖨️ Imprimir</button></div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)

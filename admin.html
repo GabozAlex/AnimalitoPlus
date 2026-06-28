@@ -21,7 +21,7 @@
     .sidebar .logo span { color: var(--gold); }
     .sidebar a { display: flex; align-items: center; gap: 10px; padding: 10px 20px; color: #94a3b8; font-size: 14px; transition: .2s; }
     .sidebar a:hover, .sidebar a.active { color: #fff; background: rgba(255,255,255,.05); }
-    .main-content { margin-left: 0; padding: 20px; min-height: 100vh; transition: .3s; }
+    .main-content { margin-left: 0; padding: 20px; min-height: 100vh; display: flex; flex-direction: column; transition: .3s; }
     .topbar-admin { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .stat-card { background: #fff; border-radius: 16px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
     .stat-card .stat-number { font-size: 28px; font-weight: 800; }
@@ -53,6 +53,9 @@
     <a href="#" onclick="showSection('config', event)"><i class="fas fa-cog"></i> Configuración</a>
     <a href="#" onclick="showSection('referidos', event)"><i class="fas fa-share-alt"></i> Referidos</a>
     <a href="#" onclick="showSection('auditoria', event)"><i class="fas fa-history"></i> Auditoría</a>
+    <a href="#" onclick="showSection('avisos', event)"><i class="fas fa-bullhorn"></i> Avisos</a>
+    <a href="#" onclick="showSection('cupos', event)"><i class="fas fa-shield-alt"></i> Cupos</a>
+    <a href="#" onclick="showSection('animales', event)"><i class="fas fa-paw"></i> Animales</a>
     <hr style="border-color:rgba(255,255,255,.1);margin:16px 20px;">
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Cerrar sesión</a>
   </div>
@@ -67,7 +70,8 @@
       <div><i class="fas fa-user-circle me-1"></i> <span id="adminName">Admin</span></div>
     </div>
 
-    <!-- SECTION: DASHBOARD -->
+    <div class="admin-page-content" style="flex:1;">
+      <!-- SECTION: DASHBOARD -->
     <div id="sec-dashboard" class="section-admin">
       <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
@@ -218,7 +222,13 @@
     <div id="sec-reportes" class="section-admin d-none">
       <h5 class="fw-bold mb-3"><i class="fas fa-file-invoice me-1 text-primary"></i> Reportes</h5>
       <div class="stat-card">
-        <h6 class="fw-bold mb-3">Semanal</h6>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h6 class="fw-bold mb-0">Semanal</h6>
+          <div>
+            <button class="btn btn-sm btn-outline-secondary me-1" onclick="descargarCSV('semanal')"><i class="fas fa-download me-1"></i> CSV</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="descargarCSV('diario')"><i class="fas fa-download me-1"></i> Diario CSV</button>
+          </div>
+        </div>
         <div id="reportesContent"><p class="text-muted">Cargando...</p></div>
       </div>
     </div>
@@ -275,6 +285,22 @@
         </div>
         <button class="btn btn-sm btn-gold mt-2" onclick="guardarLimites()"><i class="fas fa-save me-1"></i> Guardar límites</button>
       </div>
+
+      <div class="stat-card mt-3">
+        <h6 class="fw-bold mb-3"><i class="fas fa-cogs me-1 text-info"></i> Configuración general</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label" style="font-size:12px;">Multiplicador de premio</label>
+            <input type="number" class="form-control form-control-sm" id="cfgMultiplicador" min="1" step="1" value="30">
+          </div>
+          <div class="col-6">
+            <label class="form-label" style="font-size:12px;">Scraper automático (minutos)</label>
+            <input type="number" class="form-control form-control-sm" id="cfgSchedulerIntervalo" min="10" step="1" value="60">
+          </div>
+        </div>
+        <button class="btn btn-sm btn-gold mt-2" onclick="guardarGeneral()"><i class="fas fa-save me-1"></i> Guardar</button>
+        <div id="configGeneralStatus" class="mt-1"></div>
+      </div>
     </div>
 
     <!-- SECTION: REFERIDOS -->
@@ -302,6 +328,116 @@
         </div>
       </div>
     </div>
+
+    <!-- SECTION: ANIMALES -->
+    <div id="sec-animales" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-paw me-1 text-primary"></i> Animales</h5>
+      <p class="text-muted" style="font-size:12px;">Edita el nombre de cada animal. Se guarda en mayúsculas automáticamente.</p>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0" style="font-size:12px;">
+            <thead><tr><th>ID</th><th>Número</th><th>Nombre actual</th><th>Icono</th><th>Acción</th></tr></thead>
+            <tbody id="animalesTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: AVISOS -->
+    <div id="sec-avisos" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-bullhorn me-1 text-warning"></i> Avisos</h5>
+      <div class="stat-card mb-3">
+        <form id="avisoForm" onsubmit="crearAviso(event)">
+          <div class="row g-2">
+            <div class="col-4">
+              <select class="form-select form-select-sm" id="avisoLoteria">
+                <option value="">Todas las loterías</option>
+                <option value="lotto_activo">Lotto Activo</option>
+                <option value="la_granjita">La Granjita</option>
+                <option value="selvaplus">SelvaPlus</option>
+              </select>
+            </div>
+            <div class="col-8">
+              <input type="text" class="form-control form-control-sm" id="avisoTitulo" placeholder="Título del aviso" required>
+            </div>
+            <div class="col-12">
+              <textarea class="form-control form-control-sm" id="avisoContenido" rows="2" placeholder="Contenido del aviso..." required></textarea>
+            </div>
+            <div class="col-12">
+              <button type="submit" class="btn btn-sm btn-gold"><i class="fas fa-plus me-1"></i> Publicar aviso</button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0" style="font-size:12px;">
+            <thead><tr><th>ID</th><th>Fuente</th><th>Loteria</th><th>Título</th><th>Contenido</th><th>Activo</th><th>Fecha</th><th>Acción</th></tr></thead>
+            <tbody id="avisosTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div id="sec-cupos" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-shield-alt me-1 text-danger"></i> Cupos (límites por animal)</h5>
+      <div class="stat-card mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-4">
+            <label class="form-label fw-bold" style="font-size:12px;">Lotería</label>
+            <select class="form-select form-select-sm" id="cuposLoteria" onchange="cargarCuposAdmin()">
+              <option value="lotto_activo">Lotto Activo</option>
+              <option value="la_granjita">La Granjita</option>
+              <option value="selvaplus">SelvaPlus</option>
+            </select>
+          </div>
+          <div class="col-4">
+            <label class="form-label fw-bold" style="font-size:12px;">Horario</label>
+            <select class="form-select form-select-sm" id="cuposHorario" onchange="cargarCuposAdmin()">
+              <option value="">Todos</option>
+            </select>
+          </div>
+          <div class="col-4 d-flex gap-2">
+            <button class="btn btn-sm btn-success" onclick="guardarCupos()"><i class="fas fa-save me-1"></i> Guardar</button>
+            <button class="btn btn-sm btn-outline-warning" onclick="generarCuposDefault()"><i class="fas fa-magic me-1"></i> Generar</button>
+          </div>
+        </div>
+      </div>
+      <div class="stat-card p-0" style="overflow-x:auto;">
+        <table class="table table-admin table-hover mb-0" style="font-size:11px;min-width:600px;">
+          <thead><tr><th>Animal</th><th>#</th><th>Máximo (Bs)</th><th>Activo</th></tr></thead>
+          <tbody id="cuposTable"></tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+
+    <!-- FOOTER -->
+    <footer class="footer" style="margin-top:24px;padding:24px 0;">
+      <div style="max-width:900px;margin:0 auto;">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;">
+          <div>
+            <h6><i class="fas fa-building me-1"></i> Plataforma</h6>
+            <p style="margin-bottom:4px;">GabozAlex-Software</p>
+            <p style="font-size:12px;">RIF V-276505862</p>
+          </div>
+          <div>
+            <h6><i class="fas fa-gamepad me-1"></i> Loterías Oficiales</h6>
+            <a href="https://instagram.com/lottoactivovzla" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lottoactivovzla</a>
+            <a href="https://instagram.com/lagranjitaofic" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lagranjitaofic</a>
+            <a href="https://instagram.com/selvaplus" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @selvaplus</a>
+          </div>
+          <div>
+            <h6><i class="fas fa-headset me-1"></i> Soporte</h6>
+            <a href="https://wa.me/584123656230" target="_blank" rel="noopener" class="footer-wa"><i class="fab fa-whatsapp me-1"></i> +58 412-365-6230</a>
+            <p style="font-size:11px;margin-top:8px;">GabozAlex-PC — Soporte técnico</p>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          AnimalitoPlus &copy; 2026 — Todos los derechos reservados. Esta plataforma es un punto de venta de loterías oficiales.
+        </div>
+      </div>
+    </footer>
 
   </div>
 
@@ -346,7 +482,7 @@
       if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración', referidos: 'Referidos', auditoria: 'Auditoría' };
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración', referidos: 'Referidos', auditoria: 'Auditoría', avisos: 'Avisos', cupos: 'Cupos', animales: 'Animales' };
       document.getElementById('sectionTitle').textContent = titles[name] || name;
       if (name === 'usuarios') cargarUsuarios();
       if (name === 'apuestas') cargarApuestasAdmin();
@@ -357,6 +493,9 @@
       if (name === 'config') cargarConfig();
       if (name === 'referidos') cargarReferidosAdmin();
       if (name === 'auditoria') cargarAuditoria();
+      if (name === 'avisos') cargarAvisosAdmin();
+      if (name === 'cupos') cargarCuposAdmin();
+      if (name === 'animales') cargarAnimalesAdmin();
     }
 
     async function cargarTodo() {
@@ -649,6 +788,48 @@
           document.getElementById('limDia').value = lim.max_por_dia || 0;
         }
       } catch(e) { console.error(e); }
+      try {
+        const res3 = await fetch(`${API}/api/admin/config/general`, { headers: getHeaders() });
+        if (res3.ok) {
+          const gen = await res3.json();
+          if (gen.multiplicador) document.getElementById('cfgMultiplicador').value = gen.multiplicador;
+        }
+      } catch(e) { console.error(e); }
+      try {
+        const res4 = await fetch(`${API}/api/admin/config/scheduler`, { headers: getHeaders() });
+        if (res4.ok) {
+          const sched = await res4.json();
+          if (sched.intervalo_minutos) document.getElementById('cfgSchedulerIntervalo').value = sched.intervalo_minutos;
+        }
+      } catch(e) { console.error(e); }
+    }
+
+    async function guardarGeneral() {
+      const multData = {
+        multiplicador: parseInt(document.getElementById('cfgMultiplicador').value) || 30,
+      };
+      const schedData = {
+        intervalo_minutos: parseInt(document.getElementById('cfgSchedulerIntervalo').value) || 60,
+        habilitado: true,
+      };
+      try {
+        const r1 = await fetch(`${API}/api/admin/config/general`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify(multData),
+        });
+        const r2 = await fetch(`${API}/api/admin/config/scheduler`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify(schedData),
+        });
+        if (r1.ok && r2.ok) {
+          document.getElementById('configGeneralStatus').innerHTML = '<span class="text-success fw-bold"><i class="fas fa-check me-1"></i> Guardado</span>';
+          setTimeout(() => document.getElementById('configGeneralStatus').innerHTML = '', 3000);
+        } else {
+          document.getElementById('configGeneralStatus').innerHTML = '<span class="text-danger">Error al guardar</span>';
+        }
+      } catch(e) {
+        document.getElementById('configGeneralStatus').innerHTML = '<span class="text-danger">Error de conexión</span>';
+      }
     }
 
     async function guardarLimites() {
@@ -690,6 +871,21 @@
       } catch(e) {
         document.getElementById('configStatus').innerHTML = '<span class="text-danger">Error de conexión</span>';
       }
+    }
+
+    async function descargarCSV(tipo) {
+      const hoy = new Date().toISOString().slice(0,10);
+      const url = tipo === 'diario'
+        ? `${API}/api/admin/reportes/diario?formato=csv&fecha=${hoy}`
+        : `${API}/api/admin/reportes/semanal?formato=csv`;
+      const res = await fetch(url, { headers: getHeaders() });
+      if (!res.ok) { Swal.fire('Error', 'Error al descargar CSV', 'error'); return; }
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `reporte_${tipo}_${hoy}.csv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
     }
 
     async function ejecutarScraper() {
@@ -741,6 +937,186 @@
           <td style="white-space:nowrap;">${new Date(l.created_at).toLocaleString()}</td>
         </tr>`).join('');
       } catch(e) { console.error(e); }
+    }
+
+    async function cargarAvisosAdmin() {
+      try {
+        const res = await fetch(`${API}/api/admin/avisos`, { headers: getHeaders() });
+        const avisos = await res.json();
+        const tbody = document.getElementById('avisosTable');
+        if (avisos.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Sin avisos</td></tr>';
+          return;
+        }
+        const loterias = { lotto_activo: 'Lotto Activo', la_granjita: 'La Granjita', selvaplus: 'SelvaPlus' };
+        tbody.innerHTML = avisos.map(a => `<tr>
+          <td>${a.id}</td>
+          <td><span class="badge ${a.fuente === 'instagram' ? 'bg-danger' : 'bg-secondary'}">${a.fuente}</span></td>
+          <td>${a.loteria ? (loterias[a.loteria] || a.loteria) : 'Todas'}</td>
+          <td>${a.titulo}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${a.contenido || '—'}</td>
+          <td>${a.activo ? '<span class="badge bg-success">Sí</span>' : '<span class="badge bg-secondary">No</span>'}</td>
+          <td style="white-space:nowrap;">${new Date(a.created_at).toLocaleString()}</td>
+          <td>
+            <button class="btn btn-sm ${a.activo ? 'btn-outline-warning' : 'btn-outline-success'}" onclick="toggleAviso(${a.id}, ${a.activo})"><i class="fas ${a.activo ? 'fa-eye-slash' : 'fa-eye'}"></i></button>
+            <button class="btn btn-sm btn-outline-danger" onclick="eliminarAviso(${a.id})"><i class="fas fa-trash"></i></button>
+          </td>
+        </tr>`).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function crearAviso(e) {
+      e.preventDefault();
+      const data = {
+        titulo: document.getElementById('avisoTitulo').value.trim(),
+        contenido: document.getElementById('avisoContenido').value.trim(),
+        loteria: document.getElementById('avisoLoteria').value || null,
+      };
+      if (!data.titulo || !data.contenido) return;
+      try {
+        const res = await fetch(`${API}/api/admin/avisos`, {
+          method: 'POST', headers: getHeaders(),
+          body: JSON.stringify(data),
+        });
+        if (res.ok) {
+          Swal.fire('Publicado', 'Aviso creado correctamente', 'success');
+          document.getElementById('avisoForm').reset();
+          cargarAvisosAdmin();
+        } else {
+          Swal.fire('Error', 'No se pudo crear el aviso', 'error');
+        }
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+    }
+
+    async function toggleAviso(id, activo) {
+      try {
+        await fetch(`${API}/api/admin/avisos/${id}`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify({ activo: !activo }),
+        });
+        cargarAvisosAdmin();
+      } catch(e) { console.error(e); }
+    }
+
+    async function eliminarAviso(id) {
+      const result = await Swal.fire({
+        title: '¿Eliminar aviso?', icon: 'warning', showCancelButton: true,
+        confirmButtonText: 'Sí, eliminar', cancelButtonText: 'Cancelar',
+      });
+      if (!result.isConfirmed) return;
+      try {
+        await fetch(`${API}/api/admin/avisos/${id}`, { method: 'DELETE', headers: getHeaders() });
+        cargarAvisosAdmin();
+      } catch(e) { console.error(e); }
+    }
+
+    async function cargarAnimalesAdmin() {
+      try {
+        const res = await fetch(`${API}/api/admin/animales`, { headers: getHeaders() });
+        const animales = await res.json();
+        const tbody = document.getElementById('animalesTable');
+        tbody.innerHTML = animales.map(a => `<tr>
+          <td>${a.id}</td>
+          <td>${a.numero}</td>
+          <td><input type="text" class="form-control form-control-sm" id="animalName_${a.id}" value="${a.nombre}" style="width:140px;text-transform:uppercase;"></td>
+          <td><input type="text" class="form-control form-control-sm" id="animalIcon_${a.id}" value="${a.icono}" style="width:100px;"><i class="fas ${a.icono} ms-1"></i></td>
+          <td><button class="btn btn-sm btn-gold" onclick="guardarAnimal('${a.id}')"><i class="fas fa-save"></i></button></td>
+        </tr>`).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function guardarAnimal(id) {
+      const nombre = document.getElementById(`animalName_${id}`).value.trim().toUpperCase();
+      const icono = document.getElementById(`animalIcon_${id}`).value.trim();
+      if (!nombre) return;
+      try {
+        const res = await fetch(`${API}/api/admin/animales/${id}`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify({ nombre, icono }),
+        });
+        if (res.ok) { Swal.fire({ icon: 'success', title: 'Guardado', timer: 1000, showConfirmButton: false }); }
+        else { Swal.fire('Error', 'No se pudo guardar', 'error'); }
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+    }
+
+    // ===== CUPOS =====
+    async function cargarCuposAdmin() {
+      const loteria = document.getElementById('cuposLoteria').value;
+      const horarioFiltro = document.getElementById('cuposHorario').value;
+      const tbody = document.getElementById('cuposTable');
+      tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">Cargando...</td></tr>';
+      try {
+        const horarioSelect = document.getElementById('cuposHorario');
+        if (horarioSelect.options.length <= 1) {
+          for (let h = 8; h <= 19; h++) {
+            const opt = document.createElement('option');
+            opt.value = `${h}:00`;
+            opt.textContent = `${h}:00`;
+            horarioSelect.appendChild(opt);
+          }
+        }
+        const [cupos, animales] = await Promise.all([
+          fetch(`${API}/api/admin/cupos?loteria=${encodeURIComponent(loteria)}`, { headers: getHeaders() }).then(r => r.json()),
+          fetch(`${API}/api/admin/animales`, { headers: getHeaders() }).then(r => r.json()),
+        ]);
+        if (!Array.isArray(cupos) || cupos.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center py-3">Sin datos. Genera cupos primero.</td></tr>';
+          return;
+        }
+        const filtrados = horarioFiltro ? cupos.filter(c => c.horario === horarioFiltro) : cupos;
+        const animalMap = {};
+        animales.forEach(a => { animalMap[a.id] = a.nombre; });
+        tbody.innerHTML = filtrados.map(c => `
+          <tr>
+            <td>${animalMap[c.animal_id] || c.animal_id}</td>
+            <td>${c.animal_id}</td>
+            <td><input type="number" step="0.01" class="form-control form-control-sm" id="cupoMax_${c.id}" value="${c.maximo}" style="width:120px;" data-id="${c.id}"></td>
+            <td><input type="checkbox" id="cupoActivo_${c.id}" ${c.activo ? 'checked' : ''} data-id="${c.id}"></td>
+          </tr>
+        `).join('');
+      } catch(e) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-danger text-center py-3">Error al cargar</td></tr>';
+      }
+    }
+
+    async function guardarCupos() {
+      const inputs = document.querySelectorAll('#cuposTable input[type="number"]');
+      const loteria = document.getElementById('cuposLoteria').value;
+      const batch = [];
+      inputs.forEach(inp => {
+        const id = parseInt(inp.dataset.id);
+        const maximo = parseFloat(inp.value) || 0;
+        const activo = document.getElementById(`cupoActivo_${id}`)?.checked || false;
+        batch.push({ id, maximo, activo });
+      });
+      try {
+        const res = await fetch(`${API}/api/admin/cupos/batch`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify(batch),
+        });
+        if (res.ok) {
+          Swal.fire({ icon: 'success', title: 'Cupos guardados', timer: 1500, showConfirmButton: false });
+          cargarCuposAdmin();
+        } else {
+          const err = await res.json();
+          Swal.fire('Error', err.detail || 'Error al guardar', 'error');
+        }
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
+    }
+
+    async function generarCuposDefault() {
+      const result = await Swal.fire({
+        title: '¿Generar cupos?',
+        text: 'Esto creará cupos para todas las combinaciones animal×horario (8am-7pm) para las 3 loterías. Solo si no existen.',
+        icon: 'question', showCancelButton: true, confirmButtonText: 'Generar',
+      });
+      if (!result.isConfirmed) return;
+      try {
+        const res = await fetch(`${API}/api/admin/cupos/generar`, { method: 'POST', headers: getHeaders() });
+        const data = await res.json();
+        Swal.fire({ icon: 'success', title: data.mensaje, timer: 2000, showConfirmButton: false });
+        cargarCuposAdmin();
+      } catch(e) { Swal.fire('Error', 'Error de conexión', 'error'); }
     }
 
     function logout() {

@@ -12,3 +12,6 @@ requests==2.34.2
 beautifulsoup4==4.15.0
 lxml==6.1.1
 soupsieve==2.8.4
+apscheduler==3.10.4
+slowapi==0.1.9
+instagram-posts-scraper==0.0.8

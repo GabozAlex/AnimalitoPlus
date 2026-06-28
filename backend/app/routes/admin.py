@@ -1,19 +1,22 @@
+import io, csv
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import date, timedelta, datetime
+from sqlalchemy import func, desc
+from datetime import date, timedelta, datetime, time as _time
 import json
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config, Auditoria
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config, Auditoria, Notificacion, Cupo, AcumuladoCupo, Aviso, Animal
 from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, TransaccionOut, AdminPagoUpdate
 from app.auth import require_admin, get_current_user
+from app.config import CASA_DEFAULT
+
 
 
 def registrar_auditoria(db: Session, usuario_id: int, accion: str, descripcion: str = None, ip: str = None):
     db.add(Auditoria(usuario_id=usuario_id, accion=accion, descripcion=descripcion, ip=ip))
-    db.commit()
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -87,10 +90,14 @@ def listar_apuestas_admin(
 @router.get("/reportes/diario")
 def reporte_diario(
     fecha: str = None,
+    formato: str = Query(None, pattern="^(csv|json)$"),
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    target = date.fromisoformat(fecha) if fecha else date.today()
+    try:
+        target = date.fromisoformat(fecha) if fecha else date.today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
 
     total_apuestas = db.query(func.sum(Apuesta.total)).filter(Apuesta.fecha == target).scalar() or 0
     count_apuestas = db.query(func.count(Apuesta.id)).filter(Apuesta.fecha == target).scalar() or 0
@@ -102,18 +109,35 @@ def reporte_diario(
         )
         .scalar() or 0
     )
+    ganancia = round(total_apuestas - total_premios, 2)
+
+    if formato == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["fecha", "monto_jugado", "monto_premios", "ganancia_banca", "total_apuestas"])
+        w.writerow([str(target), round(total_apuestas, 2), round(total_premios, 2), ganancia, count_apuestas])
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=reporte_diario_{target}.csv"},
+        )
 
     return {
         "fecha": str(target),
         "monto_jugado": round(total_apuestas, 2),
         "monto_premios": round(total_premios, 2),
-        "ganancia_banca": round(total_apuestas - total_premios, 2),
+        "ganancia_banca": ganancia,
         "total_apuestas": count_apuestas,
     }
 
 
 @router.get("/reportes/semanal")
-def reporte_semanal(admin: Usuario = Depends(require_admin), db: Session = Depends(get_db)):
+def reporte_semanal(
+    formato: str = Query(None, pattern="^(csv|json)$"),
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
     hoy = date.today()
     inicio = hoy - timedelta(days=6)
     reportes = []
@@ -132,6 +156,19 @@ def reporte_semanal(admin: Usuario = Depends(require_admin), db: Session = Depen
             "monto_premios": round(premios, 2),
             "ganancia_banca": round(jugado - premios, 2),
         })
+
+    if formato == "csv":
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(["fecha", "monto_jugado", "monto_premios", "ganancia_banca"])
+        for r in reportes:
+            w.writerow([r["fecha"], r["monto_jugado"], r["monto_premios"], r["ganancia_banca"]])
+        buf.seek(0)
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=reporte_semanal_{inicio}_{hoy}.csv"},
+        )
 
     return reportes
 
@@ -164,7 +201,10 @@ def ingresar_resultado(
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    fecha = date.fromisoformat(data.fecha) if data.fecha else date.today()
+    try:
+        fecha = date.fromisoformat(data.fecha) if data.fecha else date.today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
     horario = datetime.strptime(data.horario, "%H:%M").time()
 
     resultado = Resultado(
@@ -187,7 +227,7 @@ def ingresar_resultado(
 @router.get("/ganadores")
 def listar_ganadores(
     loteria: Optional[str] = None,
-    usuario: Usuario = Depends(get_current_user),
+    user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -204,25 +244,28 @@ def listar_ganadores(
         query = query.filter(Apuesta.loteria == loteria)
 
     rows = query.order_by(Apuesta.created_at.desc()).limit(100).all()
+    mult = get_multiplicador(db)
 
     return [
         {
-            "usuario_id": u.id,
             "usuario_nombre": f"{u.nombre} {u.apellido}".strip(),
-            "usuario_correo": u.correo,
             "apuesta_id": a.id,
             "loteria": a.loteria,
             "fecha": a.fecha.isoformat(),
             "horario": a.horario.strftime("%H:%M"),
             "animal_id": d.animal_id,
             "monto_apostado": d.monto,
-            "premio": d.monto * 30,
+            "premio": d.monto * mult,
         }
         for a, d, u in rows
     ]
 
 
-MULTIPLICADOR = 30
+def get_multiplicador(db: Session) -> int:
+    cfg = db.query(Config).filter(Config.clave == "config_general").first()
+    if cfg:
+        return int(json.loads(cfg.valor).get("multiplicador", 30))
+    return 30
 
 
 def procesar_apuestas_por_resultado(db: Session, resultado: Resultado):
@@ -239,9 +282,10 @@ def procesar_apuestas_por_resultado(db: Session, resultado: Resultado):
     )
     ganadas = 0
     for apuesta in apuestas:
-        ganadora = any(d.animal_id == resultado.animal_id for d in apuesta.detalles)
-        if ganadora:
-            premio = apuesta.total * MULTIPLICADOR
+        detalles_ganadores = [d for d in apuesta.detalles if d.animal_id == resultado.animal_id]
+        if detalles_ganadores:
+            monto_base = sum(d.monto for d in detalles_ganadores)
+            premio = monto_base * get_multiplicador(db)
             usuario = db.query(Usuario).filter(Usuario.id == apuesta.usuario_id).first()
             if usuario:
                 usuario.saldo += premio
@@ -251,10 +295,24 @@ def procesar_apuestas_por_resultado(db: Session, resultado: Resultado):
                     monto=premio,
                     descripcion=f"Premio {resultado.loteria} {resultado.horario.strftime('%H:%M')}",
                 ))
+                db.add(Notificacion(
+                    usuario_id=usuario.id,
+                    tipo="ganada",
+                    titulo="🎉 ¡Ganaste!",
+                    contenido=f"Tu apuesta en {resultado.loteria} ({resultado.horario.strftime('%H:%M')}) — animal {resultado.animal_id} — ganó Bs {premio:.2f}",
+                    referencia_id=apuesta.id,
+                ))
             apuesta.estado = "ganada"
             ganadas += 1
         else:
             apuesta.estado = "perdida"
+            db.add(Notificacion(
+                usuario_id=apuesta.usuario_id,
+                tipo="perdida",
+                titulo="😢 No ganaste",
+                contenido=f"Tu apuesta en {resultado.loteria} ({resultado.horario.strftime('%H:%M')}) no resultó ganadora. ¡Sigue intentando!",
+                referencia_id=apuesta.id,
+            ))
     return ganadas
 
 
@@ -325,6 +383,13 @@ def listar_pagos(
     return result
 
 
+TRANSICIONES_PAGO = {
+    "pendiente": ["en_proceso", "completado", "cancelado"],
+    "en_proceso": ["completado", "cancelado"],
+    "completado": [],
+    "cancelado": [],
+}
+
 @router.post("/pagos/{pago_id}/estado")
 def cambiar_estado_pago(
     pago_id: int,
@@ -332,21 +397,32 @@ def cambiar_estado_pago(
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    pago = db.query(Transaccion).filter(Transaccion.id == pago_id).first()
+    pago = db.query(Transaccion).filter(Transaccion.id == pago_id).with_for_update().first()
     if not pago:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
+
+    if data.estado not in TRANSICIONES_PAGO.get(pago.estado, []):
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede cambiar de '{pago.estado}' a '{data.estado}'",
+        )
+
+    # Revertir saldo si se sale de completado
     if pago.estado == "completado":
-        raise HTTPException(status_code=400, detail="El pago ya fue completado")
+        user = db.query(Usuario).filter(Usuario.id == pago.usuario_id).with_for_update().first()
+        if pago.tipo == "recarga":
+            user.saldo -= pago.monto
+        elif pago.tipo == "retiro":
+            user.saldo += pago.monto
 
     if data.estado == "completado":
-        user = db.query(Usuario).filter(Usuario.id == pago.usuario_id).first()
+        user = db.query(Usuario).filter(Usuario.id == pago.usuario_id).with_for_update().first()
         if not user:
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         if pago.tipo == "recarga":
             user.saldo += pago.monto
-            # Bono de referido (5% de la primera recarga)
             if user.referido_por and not user.bono_referido:
-                referidor = db.query(Usuario).filter(Usuario.id == user.referido_por).first()
+                referidor = db.query(Usuario).filter(Usuario.id == user.referido_por).with_for_update().first()
                 if referidor:
                     bono = round(pago.monto * 0.05, 2)
                     referidor.saldo += bono
@@ -398,13 +474,94 @@ def update_config_casa(
     return {"mensaje": "Configuración de casa actualizada"}
 
 
-CASA_DEFAULT = {
-    "nombre": "Gabriel Alejandro Rosas Rosas",
-    "banco": "Banco Mercantil",
-    "banco_codigo": "0105",
-    "cedula": "27650586",
-    "telefono": "4123656230",
-}
+# ===== CONFIGURACION SCHEDULER =====
+
+@router.get("/config/scheduler")
+def get_config_scheduler(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'scheduler').first()
+    if not cfg:
+        return {"habilitado": True, "intervalo_minutos": 60}
+    return json.loads(cfg.valor)
+
+
+@router.put("/config/scheduler")
+def update_config_scheduler(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'scheduler').first()
+    if not cfg:
+        cfg = Config(clave='scheduler', valor=json.dumps(data))
+        db.add(cfg)
+    else:
+        cfg.valor = json.dumps(data)
+    db.commit()
+    return {"mensaje": "Configuración del scheduler actualizada"}
+
+
+# ===== CONFIGURACION DE HORARIOS (recarga/retiro) =====
+
+@router.get("/config/horarios")
+def get_config_horarios(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'horarios').first()
+    if not cfg:
+        return {
+            "recarga": {"inicio": "06:00", "fin": "22:00", "dias": [1, 2, 3, 4, 5, 6, 7]},
+            "retiro": {"inicio": "08:00", "fin": "16:00", "dias": [1, 2, 3, 4, 5]},
+        }
+    return json.loads(cfg.valor)
+
+
+@router.put("/config/horarios")
+def update_config_horarios(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'horarios').first()
+    if not cfg:
+        cfg = Config(clave='horarios', valor=json.dumps(data))
+        db.add(cfg)
+    else:
+        cfg.valor = json.dumps(data)
+    db.commit()
+    return {"mensaje": "Horarios actualizados"}
+
+
+# ===== CONFIGURACION GENERAL (multiplicador, etc.) =====
+
+@router.get("/config/general")
+def get_config_general(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'config_general').first()
+    if not cfg:
+        return {"multiplicador": 30}
+    return json.loads(cfg.valor)
+
+
+@router.put("/config/general")
+def update_config_general(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    cfg = db.query(Config).filter(Config.clave == 'config_general').first()
+    if not cfg:
+        cfg = Config(clave='config_general', valor=json.dumps(data))
+        db.add(cfg)
+    else:
+        cfg.valor = json.dumps(data)
+    db.commit()
+    return {"mensaje": "Configuración general actualizada"}
 
 
 # ===== CONFIGURACION DE LIMITES =====
@@ -434,3 +591,257 @@ def update_config_limites(
         cfg.valor = json.dumps(data)
     db.commit()
     return {"mensaje": "Límites actualizados"}
+
+
+# ===== AVISOS =====
+
+@router.get("/avisos")
+def listar_avisos_admin(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    avisos = db.query(Aviso).order_by(desc(Aviso.created_at)).limit(50).all()
+    return [
+        {
+            "id": a.id,
+            "fuente": a.fuente,
+            "loteria": a.loteria,
+            "titulo": a.titulo,
+            "contenido": a.contenido,
+            "url_instagram": a.url_instagram,
+            "activo": a.activo,
+            "created_at": a.created_at.isoformat(),
+        }
+        for a in avisos
+    ]
+
+
+@router.post("/avisos")
+def crear_aviso(
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    aviso = Aviso(
+        fuente="manual",
+        loteria=data.get("loteria"),
+        titulo=data.get("titulo", "Aviso"),
+        contenido=data.get("contenido", ""),
+        activo=data.get("activo", True),
+    )
+    db.add(aviso)
+    db.commit()
+    registrar_auditoria(db, admin.id, "aviso_creado", f"Aviso: {aviso.titulo}")
+    return {"mensaje": "Aviso creado", "id": aviso.id}
+
+
+@router.put("/avisos/{aviso_id}")
+def actualizar_aviso(
+    aviso_id: int,
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    aviso = db.query(Aviso).filter(Aviso.id == aviso_id).first()
+    if not aviso:
+        raise HTTPException(status_code=404, detail="Aviso no encontrado")
+    if "titulo" in data:
+        aviso.titulo = data["titulo"]
+    if "contenido" in data:
+        aviso.contenido = data["contenido"]
+    if "loteria" in data:
+        aviso.loteria = data["loteria"]
+    if "activo" in data:
+        aviso.activo = data["activo"]
+    db.commit()
+    registrar_auditoria(db, admin.id, "aviso_editado", f"Aviso #{aviso_id}")
+    return {"mensaje": "Aviso actualizado"}
+
+
+# ===== ANIMALES (admin) =====
+
+@router.get("/animales")
+def listar_animales_admin(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    animales = db.query(Animal).order_by(Animal.id).all()
+    return [
+        {"id": a.id, "numero": a.numero, "nombre": a.nombre, "icono": a.icono}
+        for a in animales
+    ]
+
+
+@router.put("/animales/{animal_id}")
+def actualizar_animal(
+    animal_id: str,
+    data: dict,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    animal = db.query(Animal).filter(Animal.id == animal_id).first()
+    if not animal:
+        raise HTTPException(status_code=404, detail="Animal no encontrado")
+    if "nombre" in data:
+        animal.nombre = data["nombre"].upper()
+    if "icono" in data:
+        animal.icono = data["icono"]
+    db.commit()
+    registrar_auditoria(db, admin.id, "animal_editado",
+        f"Animal #{animal_id}: nombre={animal.nombre}")
+    return {"mensaje": "Animal actualizado"}
+
+
+# ===== CUPOS (riesgo por animal + horario) =====
+
+@router.get("/cupos")
+def listar_cupos(
+    loteria: Optional[str] = None,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+
+    query = db.query(Cupo)
+    if loteria:
+        query = query.filter(Cupo.loteria == loteria)
+    cupos = query.order_by(Cupo.loteria, Cupo.horario, Cupo.animal_id).all()
+    return [
+        {
+            "id": c.id,
+            "loteria": c.loteria,
+            "horario": c.horario.strftime("%H:%M"),
+            "animal_id": c.animal_id,
+            "maximo": float(c.maximo),
+            "activo": c.activo,
+        }
+        for c in cupos
+    ]
+
+
+@router.put("/cupos/batch")
+def actualizar_cupos(
+    data: list[dict],
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+
+    for item in data:
+        if item.get("id"):
+            cupo = db.query(Cupo).filter(Cupo.id == item["id"]).first()
+            if cupo:
+                if "maximo" in item:
+                    cupo.maximo = item["maximo"]
+                if "activo" in item:
+                    cupo.activo = item["activo"]
+        else:
+            existente = db.query(Cupo).filter(
+                Cupo.loteria == item["loteria"],
+                Cupo.horario == _time.fromisoformat(item["horario"]),
+                Cupo.animal_id == str(item["animal_id"]),
+            ).first()
+            if not existente:
+                db.add(Cupo(
+                    loteria=item["loteria"],
+                    horario=_time.fromisoformat(item["horario"]),
+                    animal_id=str(item["animal_id"]),
+                    maximo=item.get("maximo", 0),
+                    activo=item.get("activo", True),
+                ))
+    db.commit()
+    registrar_auditoria(db, admin.id, "cupos_actualizados", f"{len(data)} cupos")
+    return {"mensaje": f"{len(data)} cupos actualizados"}
+
+
+@router.post("/cupos/generar")
+def generar_cupos_default(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+
+
+    existentes = db.query(Cupo).count()
+    if existentes > 0:
+        return {"mensaje": f"Ya existen {existentes} cupos", "generados": 0}
+    loterias = ["lotto_activo", "la_granjita", "selvaplus"]
+    horarios = [f"{h}:00" for h in range(8, 20)]
+    count = 0
+    for loteria in loterias:
+        for h in horarios:
+            for animal in ANIMALES_HARDCODE:
+                db.add(Cupo(
+                    loteria=loteria,
+                    horario=_time.fromisoformat(h),
+                    animal_id=str(animal["id"]),
+                    maximo=0,
+                    activo=False,
+                ))
+                count += 1
+    db.commit()
+    registrar_auditoria(db, admin.id, "cupos_generados", f"{count} cupos creados")
+    return {"mensaje": f"{count} cupos generados", "generados": count}
+
+
+@router.get("/cupos/acumulados")
+def listar_acumulados(
+    fecha: Optional[str] = None,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    today = date.today()
+    q = db.query(AcumuladoCupo)
+    if fecha:
+        try:
+            q = q.filter(AcumuladoCupo.fecha == date.fromisoformat(fecha))
+        except ValueError:
+            q = q.filter(AcumuladoCupo.fecha == today)
+    else:
+        q = q.filter(AcumuladoCupo.fecha == today)
+    rows = q.order_by(AcumuladoCupo.loteria, AcumuladoCupo.horario, AcumuladoCupo.animal_id).all()
+    return [
+        {
+            "fecha": r.fecha.isoformat(),
+            "loteria": r.loteria,
+            "horario": r.horario.strftime("%H:%M"),
+            "animal_id": r.animal_id,
+            "acumulado": float(r.acumulado),
+        }
+        for r in rows
+    ]
+
+
+@router.post("/cupos/reset-acumulados")
+def reset_acumulados(
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+
+    count = db.query(AcumuladoCupo).delete()
+    db.commit()
+    registrar_auditoria(db, admin.id, "acumulados_reset", f"{count} registros eliminados")
+    return {"mensaje": f"{count} acumulados eliminados"}
+
+
+@router.delete("/avisos/{aviso_id}")
+def eliminar_aviso(
+    aviso_id: int,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+
+    aviso = db.query(Aviso).filter(Aviso.id == aviso_id).first()
+    if not aviso:
+        raise HTTPException(status_code=404, detail="Aviso no encontrado")
+    db.delete(aviso)
+    db.commit()
+    registrar_auditoria(db, admin.id, "aviso_eliminado", f"Aviso #{aviso_id}")
+    return {"mensaje": "Aviso eliminado"}

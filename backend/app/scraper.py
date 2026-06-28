@@ -111,8 +111,9 @@ def scrape_lottery(url: str, loteria: str, fecha: str) -> list[dict]:
         records.append({
             "fecha": fecha,
             "loteria": loteria,
-            "numero": animal_id,
+            "numero": num_str,
             "animal": animal.upper(),
+            "animal_id": animal_id,
             "horario": hour_24,
         })
 
@@ -123,14 +124,13 @@ def scrape_lottery(url: str, loteria: str, fecha: str) -> list[dict]:
 def save_results(db: Session, records: list[dict]) -> int:
     saved = 0
     for r in records:
-        animal_id_str = r["numero"]
         exists = (
             db.query(Resultado)
             .filter(
                 Resultado.fecha == r["fecha"],
                 Resultado.loteria == r["loteria"],
                 Resultado.horario == r["horario"],
-                Resultado.animal_id == animal_id_str,
+                Resultado.animal_id == r["animal_id"],
             )
             .first()
         )
@@ -142,8 +142,8 @@ def save_results(db: Session, records: list[dict]) -> int:
             fecha=r["fecha"],
             loteria=r["loteria"],
             horario=horario_time,
-            animal_id=animal_id_str,
-            numero=animal_id_str,
+            animal_id=r["animal_id"],
+            numero=r["numero"],
         ))
         saved += 1
     db.commit()

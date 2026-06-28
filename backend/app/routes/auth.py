@@ -1,17 +1,19 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import Usuario
 from app.schemas import UsuarioCreate, UsuarioLogin, UsuarioOut, UsuarioUpdate, Token
 from app.auth import hash_password, verify_password, create_access_token, get_current_user
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/register", response_model=Token)
-def register(data: UsuarioCreate, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, data: UsuarioCreate, db: Session = Depends(get_db)):
     existe = db.query(Usuario).filter(Usuario.correo == data.correo).first()
     if existe:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
@@ -48,7 +50,8 @@ def register(data: UsuarioCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-def login(data: UsuarioLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, data: UsuarioLogin, db: Session = Depends(get_db)):
     usuario = db.query(Usuario).filter(Usuario.correo == data.correo).first()
     if not usuario or not verify_password(data.clave, usuario.clave):
         raise HTTPException(status_code=401, detail="Correo o contraseña incorrectos")
@@ -66,7 +69,7 @@ def get_perfil(user: Usuario = Depends(get_current_user)):
 
 @router.put("/perfil", response_model=UsuarioOut)
 def update_perfil(data: UsuarioUpdate, user: Usuario = Depends(get_current_user), db: Session = Depends(get_db)):
-    for campo, valor in data.model_dump(exclude_unset=True).items():
+    for campo, valor in data.model_dump(exclude_unset=True, exclude_none=True).items():
         setattr(user, campo, valor)
     db.commit()
     db.refresh(user)

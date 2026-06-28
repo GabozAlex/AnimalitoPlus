@@ -23,8 +23,15 @@ document.addEventListener('DOMContentLoaded', () => {
   renderLotterySelector();
   renderHourGrid();
   setupBetAmounts();
-  revisarNovedades();
+  cargarAvisos();
+  iniciarPollNotis();
   document.getElementById('btnPlay')?.addEventListener('click', playBets);
+});
+
+// Re-render animal grid when animales are loaded from API
+window.addEventListener('animalesLoaded', () => {
+  renderAnimalGrid();
+  renderBetSlip();
 });
 
 function setupBetAmounts() {
@@ -97,19 +104,58 @@ function renderAnimalGrid() {
   const grid = document.getElementById('animalGrid');
   if (!grid) return;
   const imgFolder = LOTTERY_IMAGE_FOLDER[selectedLoteria] || 'lotto_activo';
-  grid.innerHTML = ANIMALES.map(a => {
-    const imgName = a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase();
-    return `
-    <div class="animal-item" data-id="${a.id}" onclick="toggleAnimal('${a.id}')">
-      <img src="img/animales/${imgFolder}/${imgName}.webp" alt="${a.nombre}" class="animal-img" loading="lazy">
-      <div class="animal-number">${String(a.id).padStart(2, '0')}</div>
-      <div class="animal-name">${a.nombre}</div>
-      <div class="bet-badge" id="badge-${a.id}"></div>
+  const isRed = n => [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36].includes(n);
+  const imgName = a => a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase();
+  const animalById = id => ANIMALES.find(a => String(a.id) === String(id));
+
+  // Roulette zero cells (left column)
+  const zero00 = animalById('00');
+  const zero0 = animalById('0');
+  let html = `
+    <div class="animal-item roulette-cell zero" data-id="00" onclick="toggleAnimal('00')" style="grid-column:1;grid-row:1/3;">
+      <div class="roulette-num">00</div>
+      <img src="img/animales/${imgFolder}/${imgName(zero00)}.webp" alt="BALLENA" class="roulette-img">
+      <div class="roulette-name">${zero00.nombre}</div>
     </div>
-  `}).join('');
+    <div class="animal-item roulette-cell zero" data-id="0" onclick="toggleAnimal('0')" style="grid-column:1;grid-row:3;">
+      <div class="roulette-num">0</div>
+      <img src="img/animales/${imgFolder}/${imgName(zero0)}.webp" alt="DELFIN" class="roulette-img">
+      <div class="roulette-name">${zero0.nombre}</div>
+    </div>
+  `;
+
+  // 3 rows × 12 columns
+  const rows = [
+    [3,6,9,12,15,18,21,24,27,30,33,36],
+    [2,5,8,11,14,17,20,23,26,29,32,35],
+    [1,4,7,10,13,16,19,22,25,28,31,34],
+  ];
+
+  rows.forEach((row, rIdx) => {
+    row.forEach((num, cIdx) => {
+      const a = animalById(num);
+      html += `
+        <div class="animal-item roulette-cell ${isRed(num) ? 'red' : 'black'}" data-id="${num}" onclick="toggleAnimal('${num}')" style="grid-column:${cIdx + 2};grid-row:${rIdx + 1};">
+          <div class="roulette-num">${num}</div>
+          <img src="img/animales/${imgFolder}/${imgName(a)}.webp" alt="${a.nombre}" class="roulette-img">
+          <div class="roulette-name">${a.nombre}</div>
+        </div>
+      `;
+    });
+  });
+
+  grid.innerHTML = html;
 }
 
 function toggleAnimal(id) {
+  if (!selectedLoteria) {
+    Swal.fire('Selecciona una lotería', 'Elige una lotería primero', 'warning');
+    return;
+  }
+  if (!selectedHorario) {
+    Swal.fire('Selecciona un horario', 'Elige un horario disponible primero', 'warning');
+    return;
+  }
   if (betSlip[id]) { delete betSlip[id]; }
   else { betSlip[id] = { id, monto: selectedAmount }; }
   renderBetSlip();
@@ -121,11 +167,19 @@ function updateAnimalGridUI() {
     const id = el.dataset.id;
     const isSelected = !!betSlip[id];
     el.classList.toggle('selected', isSelected);
-    const badge = document.getElementById(`badge-${id}`);
-    if (badge && isSelected) {
-      badge.textContent = betSlip[id].monto;
-      badge.style.display = 'flex';
-    } else if (badge) { badge.style.display = 'none'; }
+    const monto = isSelected ? betSlip[id].monto : null;
+    let chip = el.querySelector('.chip-overlay');
+    if (isSelected && monto) {
+      if (!chip) {
+        chip = document.createElement('div');
+        chip.className = 'chip-overlay';
+        el.appendChild(chip);
+      }
+      chip.innerHTML = `<div class="chip chip-${monto}"><span>${monto}</span></div>`;
+      chip.style.display = 'flex';
+    } else if (chip) {
+      chip.style.display = 'none';
+    }
   });
 }
 
@@ -134,29 +188,46 @@ function renderBetSlip() {
   const totalEl = document.getElementById('betTotal');
   const countEl = document.getElementById('betCount');
   const btn = document.getElementById('btnPlay');
+  const clearBtn = document.getElementById('clearBtnContainer');
   if (!container) return;
   const entries = Object.values(betSlip);
   if (entries.length === 0) {
-    container.innerHTML = '<div class="text-muted text-center py-2" style="font-size:13px;">Selecciona un animal para apostar</div>';
+    container.innerHTML = '<div class="text-muted text-center py-2" style="font-size:13px;">Elige lotería → horario → monto → toca el animal</div>';
     totalEl.textContent = 'Bs 0.00';
     countEl.textContent = '0';
     btn.disabled = true;
+    if (clearBtn) clearBtn.style.display = 'none';
     return;
   }
   let total = 0;
-  container.innerHTML = entries.map(e => {
-    const animal = ANIMALES.find(a => String(a.id) === String(e.id));
-    total += e.monto;
-    return `
-      <div class="comanda-item">
-        <span>${animal.nombre} #${String(e.id).padStart(2, '0')}</span>
-        <span><strong>Bs ${e.monto.toFixed(2)}</strong> <i class="fas fa-times text-danger ms-2" style="cursor:pointer;" onclick="removeBet(${e.id})"></i></span>
-      </div>
-    `;
-  }).join('');
+  const loteriaNom = LOTERIAS.find(l => l.key === selectedLoteria)?.nombre || selectedLoteria;
+  container.innerHTML = `
+    <div class="comanda-info">
+      <span><i class="fas fa-dice-d6 me-1"></i> ${loteriaNom}</span>
+      <span><i class="fas fa-clock me-1"></i> ${selectedHorario}</span>
+    </div>
+    <div class="comanda-hint">El monto se asigna al tocar el animal. Para cambiarlo, elimínalo y tócalo de nuevo.</div>
+    ${entries.map(e => {
+      const animal = ANIMALES.find(a => String(a.id) === String(e.id));
+      total += e.monto;
+      return `
+        <div class="comanda-item">
+          <span>${animal?.nombre || e.id} #${e.id}</span>
+          <span><strong>Bs ${e.monto.toFixed(2)}</strong> <i class="fas fa-times text-danger ms-2" style="cursor:pointer;" onclick="removeBet('${e.id}')"></i></span>
+        </div>
+      `;
+    }).join('')}
+  `;
   totalEl.textContent = `Bs ${total.toFixed(2)}`;
   countEl.textContent = entries.length;
   btn.disabled = false;
+  if (clearBtn) clearBtn.style.display = 'block';
+}
+
+function clearBetSlip() {
+  Object.keys(betSlip).forEach(k => delete betSlip[k]);
+  renderBetSlip();
+  updateAnimalGridUI();
 }
 
 function removeBet(id) {
@@ -196,7 +267,7 @@ async function playBets() {
     const a = ANIMALES.find(x => String(x.id) === String(e.id));
     const imgName = a ? a.nombre.charAt(0) + a.nombre.slice(1).toLowerCase() : '';
     return `<div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #eee;font-size:14px;">
-      <span>${imgName ? `<img src="img/animales/${imgFolder}/${imgName}.webp" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;">` : ''}${a ? a.nombre : e.id} #${String(e.id).padStart(2, '0')}</span>
+      <span>${imgName ? `<img src="img/animales/${imgFolder}/${imgName}.webp" style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:6px;">` : ''}${a ? a.nombre : e.id} #${e.id}</span>
       <strong>Bs ${e.monto.toFixed(2)}</strong>
     </div>`;
   }).join('');
@@ -247,35 +318,61 @@ async function playBets() {
   updateAnimalGridUI();
   await updateBalanceDisplay();
 
-  Swal.fire({ icon: 'success', title: '¡Jugada registrada!', text: `Total: Bs ${total.toFixed(2)}`, timer: 2000, showConfirmButton: false });
+  const data = await r.json();
+  verTicketModal(data.id);
 }
 
-async function revisarNovedades() {
+async function cargarAvisos() {
   try {
-    const ultima = localStorage.getItem('ultima_notificacion');
-    let params = '';
-    if (ultima) params = `?desde=${encodeURIComponent(ultima)}`;
-    const r = await apiFetch(`/api/apuestas/novedades${params}`);
+    const r = await apiFetch('/api/avisos');
     if (!r.ok) return;
-    const items = await r.json();
-    if (items.length === 0) return;
-    const ganadas = items.filter(i => i.estado === 'ganada');
-    const perdidas = items.filter(i => i.estado === 'perdida');
-    if (ganadas.length > 0) {
-      const totalPremio = ganadas.reduce((s, i) => s + i.premio, 0);
-      Swal.fire({
-        icon: 'success', title: '¡Ganaste!',
-        html: `${ganadas.length} ticket(s) ganador(es)<br><strong>Total: Bs ${totalPremio.toFixed(2)}</strong>`,
-        confirmButtonColor: '#f59e0b',
-      });
-    }
-    if (perdidas.length > 0) {
-      Swal.fire({
-        icon: 'info', title: 'Resultados',
-        text: `${perdidas.length} ticket(s) no resultaron ganadores. ¡Sigue intentando!`,
-        confirmButtonColor: '#0ea5e9',
-      });
-    }
-    localStorage.setItem('ultima_notificacion', new Date().toISOString());
+    const avisos = await r.json();
+    const bar = document.getElementById('avisosBar');
+    if (!bar) return;
+    if (avisos.length === 0) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    const loterias = { lotto_activo: 'Lotto Activo', la_granjita: 'La Granjita', selvaplus: 'Selva Plus' };
+    bar.innerHTML = avisos.map(a => {
+      const esInsta = a.fuente === 'instagram';
+      const badge = esInsta ? '<i class="fab fa-instagram"></i> Instagram' : '<i class="fas fa-bullhorn"></i> Aviso';
+      const extra = a.url_instagram ? `<a href="${a.url_instagram}" target="_blank" rel="noopener">Ver en Instagram</a>` : '';
+      const lote = a.loteria ? loterias[a.loteria] || a.loteria : '';
+      return `<div class="aviso-card ${esInsta ? 'aviso-instagram' : ''}">
+        <div class="aviso-icon">${esInsta ? '<i class="fab fa-instagram"></i>' : '<i class="fas fa-exclamation-triangle"></i>'}</div>
+        <div class="aviso-body">
+          <div class="aviso-titulo">${a.titulo}${lote ? ' — ' + lote : ''}</div>
+          <div class="aviso-texto">${a.contenido}</div>
+          <div class="aviso-meta">${badge} · ${new Date(a.created_at).toLocaleDateString()} ${extra ? '· ' + extra : ''}</div>
+        </div>
+      </div>`;
+    }).join('');
   } catch(e) { console.error(e); }
+}
+
+async function verTicketModal(apuestaId) {
+  try {
+    const token = getToken();
+    const res = await fetch('/api/apuestas/' + apuestaId + '/ticket', {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (!res.ok) throw new Error('Error');
+    const html = await res.text();
+    Swal.fire({
+      icon: 'success',
+      title: '¡Jugada registrada!',
+      html: `<div style="max-height:60vh;overflow:auto;text-align:left;">${html}</div>`,
+      showCancelButton: true,
+      confirmButtonText: '<i class="fas fa-print"></i> Imprimir',
+      cancelButtonText: 'Cerrar',
+      width: '500px',
+      customClass: { confirmButton: 'btn btn-primary', cancelButton: 'btn btn-secondary' },
+      buttonsStyling: false,
+      didOpen: () => {
+        const btn = Swal.getConfirmButton();
+        btn.onclick = () => { window.print(); };
+      },
+    });
+  } catch (e) {
+    Swal.fire({ icon: 'success', title: '¡Jugada registrada!', timer: 2000, showConfirmButton: false });
+  }
 }

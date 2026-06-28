@@ -10,3 +10,6 @@ Jugar _ Juegoactivo_files/
 .venv/
 __pycache__/
 *.pyc
+RIF*
+downloaded_files/
+*.log

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import date, datetime
 from typing import Optional
@@ -17,7 +17,10 @@ def listar_resultados(
     fecha: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
-    target_date = date.fromisoformat(fecha) if fecha else date.today()
+    try:
+        target_date = date.fromisoformat(fecha) if fecha else date.today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
 
     query = db.query(Resultado)
     if loteria:
@@ -47,7 +50,10 @@ def crear_resultado(
     admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
-    target_date = date.fromisoformat(data.fecha) if data.fecha else date.today()
+    try:
+        target_date = date.fromisoformat(data.fecha) if data.fecha else date.today()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Fecha inválida")
     horario = datetime.strptime(data.horario, "%H:%M").time()
 
     resultado = Resultado(
@@ -61,3 +67,44 @@ def crear_resultado(
     db.commit()
     db.refresh(resultado)
     return resultado
+
+
+@router.get("/ganadores")
+def listar_ganadores_publico(
+    loteria: Optional[str] = None,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.models import Apuesta, DetalleApuesta
+
+    query = (
+        db.query(
+            Apuesta,
+            DetalleApuesta,
+            Usuario,
+        )
+        .join(DetalleApuesta, DetalleApuesta.apuesta_id == Apuesta.id)
+        .join(Usuario, Usuario.id == Apuesta.usuario_id)
+        .filter(Apuesta.estado == "ganada")
+    )
+    if loteria:
+        query = query.filter(Apuesta.loteria == loteria)
+
+    rows = query.order_by(Apuesta.created_at.desc()).limit(100).all()
+
+    from app.routes.admin import get_multiplicador
+
+    mult = get_multiplicador(db)
+
+    return [
+        {
+            "usuario_nombre": f"{u.nombre} {u.apellido}".strip(),
+            "loteria": a.loteria,
+            "fecha": a.fecha.isoformat(),
+            "horario": a.horario.strftime("%H:%M"),
+            "animal_id": d.animal_id,
+            "monto_apostado": d.monto,
+            "premio": d.monto * mult,
+        }
+        for a, d, u in rows
+    ]

@@ -65,7 +65,7 @@ CREATE INDEX idx_resultados_loteria ON resultados(loteria);
 CREATE TABLE IF NOT EXISTS transacciones (
     id BIGSERIAL PRIMARY KEY,
     usuario_id BIGINT REFERENCES usuarios(id) NOT NULL,
-    tipo VARCHAR(20) NOT NULL,  -- recarga, retiro, apuesta, pago_premio, ajuste_admin
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('recarga', 'retiro', 'apuesta', 'pago_premio', 'ajuste_admin')),
     monto DECIMAL(12,2) NOT NULL,
     metodo VARCHAR(20),        -- pago_movil, cripto, manual
     referencia VARCHAR(255),
@@ -100,7 +100,7 @@ ON CONFLICT (clave) DO NOTHING;
 -- 8. AUDITORIA
 CREATE TABLE IF NOT EXISTS auditoria (
     id BIGSERIAL PRIMARY KEY,
-    usuario_id BIGINT REFERENCES usuarios(id),
+    usuario_id BIGINT REFERENCES usuarios(id) ON DELETE SET NULL,
     accion VARCHAR(50) NOT NULL,
     descripcion TEXT,
     ip VARCHAR(45),
@@ -110,7 +110,52 @@ CREATE TABLE IF NOT EXISTS auditoria (
 CREATE INDEX idx_auditoria_usuario ON auditoria(usuario_id);
 CREATE INDEX idx_auditoria_creado ON auditoria(created_at);
 
--- 9. REFERIDOS
-ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_referido VARCHAR(20) UNIQUE;
-ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS referido_por BIGINT REFERENCES usuarios(id);
-ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bono_referido BOOLEAN DEFAULT FALSE;
+-- 9. MIGRACION: Float → Numeric (ejecutar si ya existen tablas con columnas Float) (ejecutar si ya existen tablas con columnas Float)
+-- ALTER TABLE usuarios ALTER COLUMN saldo TYPE DECIMAL(12,2);
+-- ALTER TABLE apuestas ALTER COLUMN total TYPE DECIMAL(12,2);
+-- ALTER TABLE detalle_apuesta ALTER COLUMN monto TYPE DECIMAL(12,2);
+-- ALTER TABLE transacciones ALTER COLUMN monto TYPE DECIMAL(12,2);
+
+-- 11. MIGRACION: Agregar codigo_referido, referido_por, bono_referido (si no existen)
+-- ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS codigo_referido VARCHAR(20) UNIQUE;
+-- ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS referido_por BIGINT REFERENCES usuarios(id);
+-- ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS bono_referido BOOLEAN DEFAULT FALSE;
+
+-- 12. NOTIFICACIONES
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id BIGSERIAL PRIMARY KEY,
+    usuario_id BIGINT NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('ganada', 'perdida', 'premio', 'sistema', 'info')),
+    titulo VARCHAR(200) NOT NULL,
+    contenido TEXT,
+    referencia_id INTEGER,
+    leida BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_notificaciones_usuario ON notificaciones(usuario_id);
+CREATE INDEX idx_notificaciones_no_leidas ON notificaciones(usuario_id, leida) WHERE leida = FALSE;
+
+-- 13. CUPOS (configuración de límites por animal + horario)
+CREATE TABLE IF NOT EXISTS cupos (
+    id BIGSERIAL PRIMARY KEY,
+    loteria VARCHAR(50) NOT NULL,
+    horario TIME NOT NULL,
+    animal_id VARCHAR(3) NOT NULL,
+    maximo DECIMAL(12,2) NOT NULL DEFAULT 0,
+    activo BOOLEAN DEFAULT TRUE,
+    UNIQUE (loteria, horario, animal_id)
+);
+
+-- 14. ACUMULADOS DE CUPOS (se resetea diariamente)
+CREATE TABLE IF NOT EXISTS acumulados_cupos (
+    fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+    loteria VARCHAR(50) NOT NULL,
+    horario TIME NOT NULL,
+    animal_id VARCHAR(3) NOT NULL,
+    acumulado DECIMAL(12,2) NOT NULL DEFAULT 0,
+    PRIMARY KEY (fecha, loteria, horario, animal_id)
+);
+
+-- 15. FOLIO en apuestas
+ALTER TABLE apuestas ADD COLUMN IF NOT EXISTS folio VARCHAR(20) UNIQUE;

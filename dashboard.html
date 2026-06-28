@@ -29,35 +29,53 @@
       <a href="#" onclick="showWithdrawModal()"><i class="fas fa-upload me-1"></i> Retirar</a>
       <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
-    <div class="header-balance"><i class="fas fa-wallet me-1"></i> Bs <span id="navBalance" x-text="$store.app.balance.toFixed(2)">0.00</span></div>
+    <div class="header-balance" style="position:relative;">
+      <span class="notif-bell" onclick="mostrarNotificaciones()" style="cursor:pointer;margin-right:10px;font-size:18px;position:relative;">
+        <i class="fas fa-bell"></i>
+        <span class="notif-badge" style="position:absolute;top:-6px;right:-8px;background:#ef4444;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:700;">0</span>
+      </span>
+      <i class="fas fa-wallet me-1"></i> Bs <span id="navBalance" x-text="$store.app.balance.toFixed(2)">0.00</span>
+    </div>
     <a href="#" onclick="logout()" class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
   </header>
 
-  <!-- LOTTERY SELECTOR -->
+  <main class="page-content">
+    <!-- LOTTERY SELECTOR -->
   <div class="lottery-selector" id="lotterySelector"></div>
+
+  <!-- AVISOS -->
+  <div class="avisos-bar" id="avisosBar"></div>
 
   <!-- HOUR GRID -->
   <div class="hour-grid-label"><i class="fas fa-clock me-1"></i> Horarios disponibles</div>
   <div class="hour-grid" id="hourGrid"></div>
 
   <!-- BET AMOUNTS -->
+  <div class="section-label"><i class="fas fa-coins me-1"></i> Monto de la apuesta</div>
   <div class="bet-selector">
-    <div class="bet-amt active" data-amt="1">Bs 1</div>
-    <div class="bet-amt" data-amt="2">Bs 2</div>
-    <div class="bet-amt" data-amt="5">Bs 5</div>
-    <div class="bet-amt" data-amt="10">Bs 10</div>
-    <div class="bet-amt" data-amt="15">Bs 15</div>
-    <div class="bet-amt" data-amt="20">Bs 20</div>
-    <div class="bet-amt" data-amt="25">Bs 25</div>
-    <div class="bet-amt" data-amt="30">Bs 30</div>
-    <div class="bet-amt" data-amt="35">Bs 35</div>
-    <div class="bet-amt" data-amt="40">Bs 40</div>
-    <div class="bet-amt" data-amt="45">Bs 45</div>
-    <div class="bet-amt" data-amt="50">Bs 50</div>
+    <div class="bet-amt active" data-amt="1">1</div>
+    <div class="bet-amt" data-amt="2">2</div>
+    <div class="bet-amt" data-amt="5">5</div>
+    <div class="bet-amt" data-amt="10">10</div>
+    <div class="bet-amt" data-amt="15">15</div>
+    <div class="bet-amt" data-amt="20">20</div>
+    <div class="bet-amt" data-amt="25">25</div>
+    <div class="bet-amt" data-amt="30">30</div>
+    <div class="bet-amt" data-amt="35">35</div>
+    <div class="bet-amt" data-amt="40">40</div>
+    <div class="bet-amt" data-amt="45">45</div>
+    <div class="bet-amt" data-amt="50">50</div>
   </div>
 
   <!-- ANIMAL GRID -->
   <div class="animal-grid" id="animalGrid"></div>
+
+  <!-- CLEAR BUTTON -->
+  <div class="text-center" id="clearBtnContainer" style="display:none;margin-bottom:8px;">
+    <button class="btn btn-clear" onclick="clearBetSlip()">
+      <i class="fas fa-eraser me-1"></i> Limpiar selección
+    </button>
+  </div>
 
   <!-- COMANDA -->
   <div class="comanda">
@@ -77,6 +95,8 @@
     </button>
   </div>
 
+  </main>
+
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
     <a href="dashboard.html" class="active"><i class="fas fa-gamepad"></i> Jugar</a>
@@ -89,6 +109,33 @@
     <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
   </nav>
 
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div style="max-width:900px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;">
+        <div>
+          <h6><i class="fas fa-building me-1"></i> Plataforma</h6>
+          <p style="margin-bottom:4px;">GabozAlex-Software</p>
+          <p style="font-size:12px;">RIF V-276505862</p>
+        </div>
+        <div>
+          <h6><i class="fas fa-gamepad me-1"></i> Loterías Oficiales</h6>
+          <a href="https://instagram.com/lottoactivovzla" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lottoactivovzla</a>
+          <a href="https://instagram.com/lagranjitaofic" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lagranjitaofic</a>
+          <a href="https://instagram.com/selvaplus" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @selvaplus</a>
+        </div>
+        <div>
+          <h6><i class="fas fa-headset me-1"></i> Soporte</h6>
+          <a href="https://wa.me/584123656230" target="_blank" rel="noopener" class="footer-wa"><i class="fab fa-whatsapp me-1"></i> +58 412-365-6230</a>
+          <p style="font-size:11px;margin-top:8px;">GabozAlex-PC — Soporte técnico</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        AnimalitoPlus &copy; 2026 — Todos los derechos reservados. Esta plataforma es un punto de venta de loterías oficiales.
+      </div>
+    </div>
+  </footer>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script>
@@ -100,5 +147,8 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
   <script src="js/app.js"></script>
   <script src="js/dashboard.js"></script>
+  <script>
+    iniciarPollNotis();
+  </script>
 </body>
 </html>

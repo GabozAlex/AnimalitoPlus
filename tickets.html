@@ -28,11 +28,18 @@
       <a href="#" onclick="showWithdrawModal()"><i class="fas fa-upload me-1"></i> Retirar</a>
       <a href="#" onclick="logout()"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </nav>
-    <div class="header-balance"><i class="fas fa-wallet me-1"></i> Bs <span id="navBalance">0.00</span></div>
+    <div class="header-balance" style="position:relative;">
+      <span class="notif-bell" onclick="mostrarNotificaciones()" style="cursor:pointer;margin-right:10px;font-size:18px;position:relative;">
+        <i class="fas fa-bell"></i>
+        <span class="notif-badge" style="position:absolute;top:-6px;right:-8px;background:#ef4444;color:#fff;font-size:10px;border-radius:50%;width:18px;height:18px;display:none;align-items:center;justify-content:center;font-weight:700;">0</span>
+      </span>
+      <i class="fas fa-wallet me-1"></i> Bs <span id="navBalance">0.00</span>
+    </div>
     <a href="#" onclick="logout()" class="btn btn-outline-light btn-sm d-md-none" style="border-color:var(--text);color:var(--text);"><i class="fas fa-sign-out-alt"></i></a>
   </header>
 
-  <!-- PAGE HEADER -->
+  <main class="page-content">
+    <!-- PAGE HEADER -->
   <div class="page-header">
     <h4><i class="fas fa-ticket me-2"></i> Mis Tickets</h4>
   </div>
@@ -61,21 +68,52 @@
         <thead>
           <tr>
             <th>Fecha</th>
+            <th>Folio</th>
             <th>Lotería</th>
             <th>Hora</th>
             <th>Animales</th>
             <th>Total</th>
             <th>Estado</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="ticketsBody">
           <tr>
-            <td colspan="6" class="text-center text-muted py-4">Cargando tickets...</td>
+            <td colspan="8" class="text-center text-muted py-4">Cargando tickets...</td>
           </tr>
         </tbody>
       </table>
     </div>
   </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div style="max-width:900px;margin:0 auto;">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:24px;">
+        <div>
+          <h6><i class="fas fa-building me-1"></i> Plataforma</h6>
+          <p style="margin-bottom:4px;">GabozAlex-Software</p>
+          <p style="font-size:12px;">RIF V-276505862</p>
+        </div>
+        <div>
+          <h6><i class="fas fa-gamepad me-1"></i> Loterías Oficiales</h6>
+          <a href="https://instagram.com/lottoactivovzla" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lottoactivovzla</a>
+          <a href="https://instagram.com/lagranjitaofic" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @lagranjitaofic</a>
+          <a href="https://instagram.com/selvaplus" target="_blank" rel="noopener"><i class="fab fa-instagram me-1"></i> @selvaplus</a>
+        </div>
+        <div>
+          <h6><i class="fas fa-headset me-1"></i> Soporte</h6>
+          <a href="https://wa.me/584123656230" target="_blank" rel="noopener" class="footer-wa"><i class="fab fa-whatsapp me-1"></i> +58 412-365-6230</a>
+          <p style="font-size:11px;margin-top:8px;">GabozAlex-PC — Soporte técnico</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        AnimalitoPlus &copy; 2026 — Todos los derechos reservados. Esta plataforma es un punto de venta de loterías oficiales.
+      </div>
+    </div>
+  </footer>
 
   <!-- BOTTOM NAV -->
   <nav class="bottom-nav">
@@ -95,6 +133,67 @@
   <script>
     const LOTERIAS = { lotto_activo: 'Lotto Activo', la_granjita: 'La Granjita', selvaplus: 'Selva Plus' };
 
+    async function cargarTickets() {
+      const tbody = document.getElementById('ticketsBody');
+      tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Cargando...</td></tr>';
+      try {
+        const loteria = document.getElementById('loteriaSelect').value;
+        const fecha = document.getElementById('datePicker').value;
+        let url = '/api/apuestas?limit=100';
+        if (loteria) url += '&loteria=' + encodeURIComponent(loteria);
+        if (fecha) url += '&fecha=' + encodeURIComponent(fecha);
+        const apuestas = await apiFetch(url);
+        if (!apuestas || apuestas.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Sin tickets</td></tr>';
+          return;
+        }
+        tbody.innerHTML = apuestas.map(a => {
+          const animales = a.detalles?.map(d => `#${d.animal_id} $${d.monto}`).join(', ') || '—';
+          const total = a.total || a.detalles?.reduce((s, d) => s + d.monto, 0) || 0;
+          const estadoClass = a.estado === 'ganada' ? 'text-success' : a.estado === 'perdida' ? 'text-danger' : 'text-warning';
+          return `<tr>
+            <td>${a.fecha || '—'}</td>
+            <td style="font-size:10px;">${a.folio || '—'}</td>
+            <td>${LOTERIAS[a.loteria] || a.loteria}</td>
+            <td>${a.horario || '—'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${animales}">${animales}</td>
+            <td><strong>Bs ${total.toFixed(2)}</strong></td>
+            <td class="${estadoClass} fw-bold">${a.estado || 'pendiente'}</td>
+            <td><button class="btn btn-sm btn-outline-primary" onclick="verTicket(${a.id})"><i class="fas fa-print"></i></button></td>
+          </tr>`;
+        }).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4">Error al cargar</td></tr>';
+      }
+    }
+
+    async function verTicket(apuestaId) {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch('/api/apuestas/' + apuestaId + '/ticket', {
+          headers: { Authorization: 'Bearer ' + token },
+        });
+        if (!res.ok) throw new Error('Error');
+        const html = await res.text();
+        Swal.fire({
+          title: 'Comprobante',
+          html: '<div style="max-height:70vh;overflow:auto;">' + html + '</div>',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-print"></i> Imprimir',
+          cancelButtonText: 'Cerrar',
+          width: '500px',
+          customClass: { confirmButton: 'btn btn-primary', cancelButton: 'btn btn-secondary' },
+          buttonsStyling: false,
+          didOpen: () => {
+            const btn = Swal.getConfirmButton();
+            btn.onclick = () => { window.print(); };
+          },
+        });
+      } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar el ticket' });
+      }
+    }
+
     document.addEventListener('DOMContentLoaded', async () => {
       const token = requireAuth();
       if (!token) return;
@@ -106,43 +205,7 @@
       }
       await cargarTickets();
     });
-
-    async function cargarTickets() {
-      const tbody = document.getElementById('ticketsBody');
-      const loteria = document.getElementById('loteriaSelect').value;
-      const fecha = document.getElementById('datePicker').value;
-
-      let params = '?limit=200';
-      if (loteria) params += `&loteria=${encodeURIComponent(loteria)}`;
-      if (fecha) params += `&fecha=${encodeURIComponent(fecha)}`;
-
-      const res = await apiFetch(`/api/apuestas${params}`);
-      if (!res.ok) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-3">Error al cargar tickets</td></tr>';
-        return;
-      }
-      const apuestas = await res.json();
-      if (apuestas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No tienes tickets aún</td></tr>';
-        return;
-      }
-      tbody.innerHTML = apuestas.map(a => {
-        const animales = a.detalles.map(d => {
-          const an = ANIMALES.find(x => String(x.id) === String(d.animal_id));
-          return an ? `<i class="fas ${an.icono} me-1"></i>${an.nombre}` : d.animal_id;
-        }).join(', ');
-        const badges = { pendiente: 'badge bg-warning text-dark', ganada: 'badge bg-success', perdida: 'badge bg-danger', pagada: 'badge bg-primary' };
-        const badge = badges[a.estado] || 'badge bg-secondary';
-        return `<tr>
-          <td>${a.fecha}</td>
-          <td>${LOTERIAS[a.loteria] || a.loteria}</td>
-          <td>${a.horario}</td>
-          <td>${animales}</td>
-          <td class="fw-bold">Bs ${a.total.toFixed(2)}</td>
-          <td><span class="${badge}">${a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}</span></td>
-        </tr>`;
-      }).join('');
-    }
   </script>
+  <script>iniciarPollNotis();</script>
 </body>
 </html>

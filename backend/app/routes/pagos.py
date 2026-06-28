@@ -1,15 +1,42 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import date
+from datetime import date, datetime, time
 import json
 
 from app.database import get_db
 from app.models import Usuario, Transaccion, Config
 from app.schemas import RecargaCreate, RetiroCreate, TransaccionOut
 from app.auth import get_current_user
+from app.config import CASA_DEFAULT
 
 router = APIRouter(prefix="/api/pagos", tags=["pagos"])
+
+
+def _validar_horario(db: Session, tipo: str):
+    cfg = db.query(Config).filter(Config.clave == "horarios").first()
+    if not cfg:
+        return
+    data = json.loads(cfg.valor)
+    horario = data.get(tipo)
+    if not horario:
+        return
+    ahora = datetime.now()
+    dia_semana = ahora.isoweekday()
+    dias = horario.get("dias", [])
+    if dia_semana not in dias:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Los {tipo}s no están disponibles hoy. Días hábiles: {', '.join(map(str, dias))}",
+        )
+    inicio = time.fromisoformat(horario["inicio"])
+    fin = time.fromisoformat(horario["fin"])
+    ahora_hora = ahora.time()
+    if not (inicio <= ahora_hora <= fin):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Los {tipo}s solo están disponibles de {horario['inicio']} a {horario['fin']}",
+        )
 
 
 @router.post("/recarga")
@@ -18,8 +45,11 @@ def solicitar_recarga(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _validar_horario(db, "recarga")
     if data.monto <= 0:
         raise HTTPException(status_code=400, detail="Monto inválido")
+
+    user = db.query(Usuario).filter(Usuario.id == user.id).with_for_update().first()
 
     extra = {}
     if data.banco_origen:
@@ -50,8 +80,11 @@ def solicitar_retiro(
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    _validar_horario(db, "retiro")
     if data.monto <= 0:
         raise HTTPException(status_code=400, detail="Monto inválido")
+
+    user = db.query(Usuario).filter(Usuario.id == user.id).with_for_update().first()
     if data.monto > user.saldo:
         raise HTTPException(status_code=400, detail="Saldo insuficiente")
 
@@ -107,15 +140,6 @@ def historial_pagos(
             "usuario_titular": u.pago_movil_titular if u else None,
         })
     return result
-
-
-CASA_DEFAULT = {
-    "nombre": "Gabriel Alejandro Rosas Rosas",
-    "banco": "Banco Mercantil",
-    "banco_codigo": "0105",
-    "cedula": "27650586",
-    "telefono": "4123656230",
-}
 
 
 @router.get("/config/casa")

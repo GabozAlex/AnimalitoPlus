@@ -73,6 +73,77 @@ async function updateBalanceDisplay() {
   } catch (e) { console.error('updateBalanceDisplay:', e); }
 }
 
+// ===== NOTIFICACIONES =====
+let notifInterval = null;
+
+async function cargarContadorNotis() {
+  try {
+    const res = await apiFetch('/api/notificaciones/no-leidas');
+    if (!res.ok) return;
+    const { count } = await res.json();
+    document.querySelectorAll('.notif-badge').forEach(el => {
+      el.textContent = count;
+      el.style.display = count > 0 ? 'flex' : 'none';
+    });
+  } catch (e) { console.error(e); }
+}
+
+async function mostrarNotificaciones() {
+  const res = await apiFetch('/api/notificaciones');
+  if (!res.ok) return;
+  const notis = await res.json();
+  const icons = { ganada: '🎉', perdida: '😢', premio: '💰', sistema: '🔔', info: '📢' };
+  Swal.fire({
+    title: 'Notificaciones',
+    html: notis.length === 0
+      ? '<div class="text-muted py-4">No hay notificaciones</div>'
+      : '<div style="max-height:400px;overflow-y:auto;text-align:left;">' +
+        notis.map(n => `
+          <div class="notif-item ${n.leida ? '' : 'fw-bold'}" style="padding:8px 0;border-bottom:1px solid #eee;cursor:pointer;"
+               onclick="${n.leida ? '' : `marcarLeida(${n.id});this.classList.remove('fw-bold')`}">
+            <div style="font-size:13px;">${icons[n.tipo] || '🔔'} ${n.titulo}</div>
+            <div style="font-size:12px;color:#64748b;">${n.contenido || ''}</div>
+            <small style="font-size:11px;color:#94a3b8;">${new Date(n.created_at).toLocaleString()}</small>
+          </div>
+        `).join('') + '</div>',
+    showCancelButton: notis.some(n => !n.leida),
+    cancelButtonText: 'Marcar todas leídas',
+    confirmButtonText: 'Cerrar',
+    confirmButtonColor: '#0ea5e9',
+    didOpen: () => { cargarContadorNotis(); },
+  }).then(r => {
+    if (r.isDismissed && notis.some(n => !n.leida)) {
+      apiFetch('/api/notificaciones/leer-todas', { method: 'PUT' }).then(() => cargarContadorNotis());
+    }
+  });
+}
+
+async function marcarLeida(id) {
+  await apiFetch(`/api/notificaciones/${id}/leer`, { method: 'PUT' });
+  cargarContadorNotis();
+}
+
+function iniciarPollNotis() {
+  cargarContadorNotis();
+  if (notifInterval) clearInterval(notifInterval);
+  notifInterval = setInterval(async () => {
+    try {
+      const res = await apiFetch('/api/notificaciones/no-leidas');
+      if (!res.ok) return;
+      const { count } = await res.json();
+      const prevCount = parseInt(localStorage.getItem('notifCount') || '0');
+      document.querySelectorAll('.notif-badge').forEach(el => {
+        el.textContent = count;
+        el.style.display = count > 0 ? 'flex' : 'none';
+      });
+      if (count > 0 && prevCount === 0) {
+        mostrarNotificaciones();
+      }
+      localStorage.setItem('notifCount', count);
+    } catch (e) { console.error(e); }
+  }, 30000);
+}
+
 async function renderResults(fecha, loteria) {
   const container = document.getElementById('resultsBody');
   if (!container) return;
@@ -105,14 +176,14 @@ async function renderResults(fecha, loteria) {
       return `
       <tr>
         <td>${r.horario}</td>
-        <td><div class="animal-cell">${imgSrc ? `<img src="${imgSrc}" alt="${animal.nombre}" loading="lazy">` : `<i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i>`} ${animal ? animal.nombre : r.animal_id}</div></td>
+        <td><div class="animal-cell">${imgSrc ? `<img src="${imgSrc}" alt="${animal?.nombre || ''}" loading="lazy">` : `<i class="fas ${animal ? animal.icono : 'fa-paw'} text-primary"></i>`} ${animal ? animal.nombre : r.animal_id}</div></td>
         <td class="num-cell">${r.numero}</td>
       </tr>
     `;
     }).join('');
 }
 
-const ANIMALES = [
+let ANIMALES = [
   { id: '0',  numero: '0',  nombre: 'DELFIN',   icono: 'fa-fish' },
   { id: '00', numero: '00', nombre: 'BALLENA',  icono: 'fa-fish' },
   { id: 1,  numero: '01', nombre: 'CARNERO',  icono: 'fa-horse-head' },
@@ -152,6 +223,23 @@ const ANIMALES = [
   { id: 35, numero: '35', nombre: 'JIRAFA',   icono: 'fa-paw' },
   { id: 36, numero: '36', nombre: 'CULEBRA',  icono: 'fa-worm' },
 ];
+
+async function loadAnimalesFromAPI() {
+  try {
+    const url = `${API_BASE}/api/animales`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.length > 0) {
+      ANIMALES.length = 0;
+      ANIMALES.push(...data);
+      window.dispatchEvent(new CustomEvent('animalesLoaded'));
+    }
+  } catch(e) { console.warn('No se pudieron cargar animales desde API, usando hardcode'); }
+}
+
+// Cargar animales desde API al iniciar (no bloquea)
+loadAnimalesFromAPI();
 
 const BANCOS = [
   { codigo: '0001', nombre: 'Banco Central de Venezuela (BCV)' },
@@ -276,13 +364,24 @@ async function showRechargeModal() {
         <div class="mb-1"><strong>Cédula:</strong> ${casa.cedula}</div>
         <div class="mb-1"><strong>Teléfono:</strong> ${formatPhone(casa.telefono)}</div>
       </div>
+      <div class="alert alert-info py-1 px-2 mb-2" style="font-size:12px;border-radius:6px;">
+        <i class="fas fa-clock me-1"></i> Si el pago es de otro banco, la recarga puede tardar unos minutos. No te preocupes.
+      </div>
       <div class="mb-2">
         <label class="form-label">Monto a recargar (Bs) <span class="text-danger">*</span></label>
         <input type="number" id="swal-monto" class="form-control" min="1" step="0.5" placeholder="Ej: 50">
+        <div class="quick-amounts" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=10">Bs 10</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=20">Bs 20</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=50">Bs 50</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=100">Bs 100</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=200">Bs 200</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('swal-monto').value=500">Bs 500</button>
+        </div>
       </div>
       <div class="mb-2">
         <label class="form-label">Número de referencia <span class="text-danger">*</span></label>
-        <input type="text" id="swal-ref" class="form-control" placeholder="Ej: 123456789">
+        <input type="text" id="swal-ref" class="form-control" placeholder="Ej: 123456 (4, 6 o 12 dígitos)">
       </div>
       <div class="mb-2">
         <label class="form-label">Tipo de pago <span class="text-danger">*</span></label>
@@ -303,8 +402,13 @@ async function showRechargeModal() {
     preConfirm: () => {
       const monto = parseFloat(document.getElementById('swal-monto').value);
       if (!monto || monto <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
+      if (monto < 10) { Swal.showValidationMessage('El monto mínimo es Bs 10'); return false; }
+      if (monto > 10000) { Swal.showValidationMessage('El monto máximo es Bs 10.000'); return false; }
       const ref = document.getElementById('swal-ref').value.trim();
       if (!ref) { Swal.showValidationMessage('Ingresa el número de referencia'); return false; }
+      if (!/^\d{4}$|^\d{6}$|^\d{12}$/.test(ref)) {
+        Swal.showValidationMessage('La referencia debe tener 4, 6 o 12 dígitos numéricos'); return false;
+      }
       const tipo = document.getElementById('swal-tipo').value;
       const fecha = document.getElementById('swal-fecha').value;
       return { monto, referencia: ref, movement_type: tipo, fecha };
@@ -350,6 +454,13 @@ async function showWithdrawModal() {
       <div class="mb-3">
         <label class="form-label">Monto a retirar (Bs)</label>
         <input type="number" id="swal-withdraw" class="form-control" min="1" max="${saldoActual}" step="0.5" placeholder="Ej: 20">
+        <div class="quick-amounts" style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('swal-withdraw').value=Math.min(10, ${saldoActual})">Bs 10</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('swal-withdraw').value=Math.min(20, ${saldoActual})">Bs 20</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('swal-withdraw').value=Math.min(50, ${saldoActual})">Bs 50</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('swal-withdraw').value=Math.min(100, ${saldoActual})">Bs 100</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('swal-withdraw').value=Math.min(200, ${saldoActual})">Bs 200</button>
+        </div>
       </div>
     `,
     showCancelButton: true,
@@ -359,6 +470,8 @@ async function showWithdrawModal() {
     preConfirm: () => {
       const val = parseFloat(document.getElementById('swal-withdraw').value);
       if (!val || val <= 0) { Swal.showValidationMessage('Ingresa un monto válido'); return false; }
+      if (val < 10) { Swal.showValidationMessage('El monto mínimo es Bs 10'); return false; }
+      if (val > 10000) { Swal.showValidationMessage('El monto máximo por transacción es Bs 10.000'); return false; }
       if (val > saldoActual) { Swal.showValidationMessage(`El monto no puede exceder tu saldo de Bs ${saldoActual.toFixed(2)}`); return false; }
       return val;
     }

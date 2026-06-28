@@ -1,7 +1,20 @@
-from pydantic import BaseModel, EmailStr, field_validator
-from typing import Optional, List
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional, List, Literal
 from datetime import date, time, datetime
 import enum
+import re
+
+
+def normalize_phone(v: str) -> str:
+    if v is None: return v
+    limpio = re.sub(r'\D', '', v)
+    if len(limpio) == 11 and limpio.startswith('0'):
+        limpio = limpio[1:]
+    if len(limpio) != 10:
+        raise ValueError('El teléfono debe tener 10 dígitos')
+    if not limpio.startswith(('412', '414', '416', '424', '426')) and not limpio.startswith('2'):
+        raise ValueError('Teléfono inválido: debe ser un número venezolano')
+    return limpio
 
 
 # ===== ESQUEMAS DE USUARIO =====
@@ -11,16 +24,32 @@ class UsuarioCreate(BaseModel):
     apellido: Optional[str] = None
     correo: EmailStr
     clave: str
-    cedula: Optional[str] = None
-    telefono: Optional[str] = None
+    cedula: Optional[str] = Field(None, pattern=r'^[VE]\d{1,8}$', max_length=20)
+    telefono: Optional[str] = Field(None, max_length=20)
     banco: Optional[str] = None
     banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
     codigo_referido: Optional[str] = None
 
+    @field_validator('clave')
+    @classmethod
+    def validar_clave(cls, v):
+        if len(v) < 6:
+            raise ValueError('La contraseña debe tener al menos 6 caracteres')
+        if not re.search(r'[A-Za-z]', v):
+            raise ValueError('La contraseña debe contener al menos una letra')
+        if not re.search(r'\d', v):
+            raise ValueError('La contraseña debe contener al menos un número')
+        return v
+
+    @field_validator('telefono')
+    @classmethod
+    def validar_telefono(cls, v):
+        return normalize_phone(v)
+
 
 class UsuarioLogin(BaseModel):
-    correo: str
+    correo: EmailStr
     clave: str
 
 
@@ -48,11 +77,16 @@ class UsuarioOut(BaseModel):
 class UsuarioUpdate(BaseModel):
     nombre: Optional[str] = None
     apellido: Optional[str] = None
-    cedula: Optional[str] = None
-    telefono: Optional[str] = None
+    cedula: Optional[str] = Field(None, pattern=r'^[VE]\d{1,8}$', max_length=20)
+    telefono: Optional[str] = Field(None, max_length=20)
     banco: Optional[str] = None
     banco_codigo: Optional[str] = None
     pago_movil_titular: Optional[str] = None
+
+    @field_validator('telefono')
+    @classmethod
+    def validar_telefono(cls, v):
+        return normalize_phone(v)
 
 
 class Token(BaseModel):
@@ -65,7 +99,7 @@ class Token(BaseModel):
 
 class DetalleApuestaCreate(BaseModel):
     animal_id: str
-    monto: float
+    monto: float = Field(gt=0)
 
 
 class ApuestaCreate(BaseModel):
@@ -90,6 +124,7 @@ class ApuestaOut(BaseModel):
     fecha: str
     horario: str
     estado: str
+    folio: Optional[str] = None
     created_at: str
     detalles: List[DetalleApuestaOut] = []
 
@@ -145,20 +180,20 @@ class ResultadoCreate(BaseModel):
 # ===== ESQUEMAS DE PAGO =====
 
 class RecargaCreate(BaseModel):
-    monto: float
+    monto: float = Field(ge=10, le=10000)
     metodo: str
-    referencia: Optional[str] = None
+    referencia: Optional[str] = Field(None, pattern=r'^\d{4}$|^\d{6}$|^\d{12}$', max_length=12)
     banco_origen: Optional[str] = None
     movement_type: Optional[str] = None
     fecha: Optional[str] = None
 
 
 class RetiroCreate(BaseModel):
-    monto: float
+    monto: float = Field(ge=10, le=10000)
 
 
 class AdminPagoUpdate(BaseModel):
-    estado: str  # "en_proceso", "completado", "cancelado"
+    estado: Literal["en_proceso", "completado", "cancelado"]
 
 
 class TransaccionOut(BaseModel):

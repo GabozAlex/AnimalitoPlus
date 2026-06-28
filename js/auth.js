@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.error-msg').forEach(el => el.classList.remove('show'));
       document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
       if (!correo || !pass) { showError('loginUsuario', 'Completa todos los campos'); return; }
+      if (!validarCorreo(correo)) { showError('loginUsuario', 'Correo inválido'); return; }
       const res = await apiFetch('/api/auth/login', {
         method: 'POST',
         body: JSON.stringify({ correo, clave: pass }),
