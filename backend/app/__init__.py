@@ -1,7 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+import traceback
 
 from app.limiter import limiter
 
@@ -13,6 +15,17 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    print(f"[global_exception] {request.method} {request.url.path}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Error interno: {type(exc).__name__}: {str(exc)}"},
+    )
+
 
 import os
 
@@ -103,8 +116,11 @@ def seed_animales():
 @app.on_event("startup")
 def startup():
     try:
+        from app.database import engine, Base
+        Base.metadata.create_all(bind=engine)
         seed_config_defaults()
         seed_animales()
         start_scheduler()
     except Exception as e:
+        traceback.print_exc()
         print(f"[startup] Error: {e}")
