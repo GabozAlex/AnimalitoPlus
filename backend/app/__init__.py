@@ -29,7 +29,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 import os
 
-_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,https://animalito-plus.vercel.app,https://animalitoplus-production.up.railway.app"
+_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:8000,https://animalito-plus.vercel.app,https://animalitoplus-production.up.railway.app"
 ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
 
 app.add_middleware(

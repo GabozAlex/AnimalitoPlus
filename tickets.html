@@ -142,7 +142,9 @@
         let url = '/api/apuestas?limit=100';
         if (loteria) url += '&loteria=' + encodeURIComponent(loteria);
         if (fecha) url += '&fecha=' + encodeURIComponent(fecha);
-        const apuestas = await apiFetch(url);
+        const res = await apiFetch(url);
+        if (!res.ok) throw new Error('Error al cargar');
+        const apuestas = await res.json();
         if (!apuestas || apuestas.length === 0) {
           tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Sin tickets</td></tr>';
           return;
@@ -169,10 +171,7 @@
 
     async function verTicket(apuestaId) {
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch('/api/apuestas/' + apuestaId + '/ticket', {
-          headers: { Authorization: 'Bearer ' + token },
-        });
+        const res = await apiFetch('/api/apuestas/' + apuestaId + '/ticket');
         if (!res.ok) throw new Error('Error');
         const html = await res.text();
         Swal.fire({

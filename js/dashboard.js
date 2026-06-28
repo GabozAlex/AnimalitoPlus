@@ -365,10 +365,7 @@ async function cargarAvisos() {
 
 async function verTicketModal(apuestaId) {
   try {
-    const token = getToken();
-    const res = await fetch('/api/apuestas/' + apuestaId + '/ticket', {
-      headers: { Authorization: 'Bearer ' + token },
-    });
+    const res = await apiFetch('/api/apuestas/' + apuestaId + '/ticket');
     if (!res.ok) throw new Error('Error');
     const html = await res.text();
     Swal.fire({
