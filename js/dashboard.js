@@ -319,7 +319,21 @@ async function playBets() {
   await updateBalanceDisplay();
 
   const data = await r.json();
-  verTicketModal(data.id);
+  const confirmResult = await Swal.fire({
+    icon: 'success',
+    title: '✅ ¡Jugada registrada!',
+    html: `
+      <div style="text-align:left;font-size:14px;margin:0 auto;display:inline-block;">
+        <p style="margin:4px 0;"><strong>Folio:</strong> ${data.folio || 'N/A'}</p>
+        <p style="margin:4px 0;"><strong>Total:</strong> <span style="color:var(--primary);">Bs ${total.toFixed(2)}</span></p>
+      </div>
+    `,
+    confirmButtonText: '<i class="fas fa-print"></i> Ver Ticket',
+    showCancelButton: true,
+    cancelButtonText: 'Cerrar',
+    confirmButtonColor: '#f59e0b',
+  });
+  if (confirmResult.isConfirmed) verTicketModal(data.id);
 }
 
 async function cargarAvisos() {

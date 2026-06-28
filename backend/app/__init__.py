@@ -16,7 +16,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 import os
 
-ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", "*").split(",")
+_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,https://animalito-plus.vercel.app,https://animalitoplus-production.up.railway.app"
+ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
 
 app.add_middleware(
     CORSMiddleware,
