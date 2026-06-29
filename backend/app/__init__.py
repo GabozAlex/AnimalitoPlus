@@ -124,6 +124,41 @@ def seed_animales():
         db.close()
 
 
+def seed_initial_users():
+    from app.database import SessionLocal
+    from app.models import Usuario, RolEnum
+
+    db = SessionLocal()
+    try:
+        admin_exists = db.query(Usuario).filter(Usuario.rol == "admin").first()
+        if admin_exists:
+            print(f"[users] Admin ya existe: {admin_exists.correo}")
+        else:
+            import os
+            from passlib.hash import bcrypt
+
+            admin_email = os.environ.get("ADMIN_EMAIL", "admin@animalitoplus.com")
+            admin_pass = os.environ.get("ADMIN_PASSWORD", "admin123")
+            test_email = os.environ.get("TEST_EMAIL", "test@animalitoplus.com")
+            test_pass = os.environ.get("TEST_PASSWORD", "test123")
+
+            users = [
+                ("Admin", "Principal", admin_email, bcrypt.hash(admin_pass), "admin"),
+                ("Test", "Usuario", test_email, bcrypt.hash(test_pass), "user"),
+            ]
+            for nombre, apellido, correo, clave, rol in users:
+                existe = db.query(Usuario).filter(Usuario.correo == correo).first()
+                if not existe:
+                    db.add(Usuario(nombre=nombre, apellido=apellido, correo=correo, clave=clave, rol=rol))
+                    print(f"[users] Creado {correo} como {rol}")
+            db.commit()
+    except Exception as e:
+        print(f"[users] Error al sembrar usuarios: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+
 @app.on_event("startup")
 def startup():
     try:
@@ -131,6 +166,7 @@ def startup():
         Base.metadata.create_all(bind=engine)
         seed_config_defaults()
         seed_animales()
+        seed_initial_users()
         start_scheduler()
     except Exception as e:
         traceback.print_exc()
