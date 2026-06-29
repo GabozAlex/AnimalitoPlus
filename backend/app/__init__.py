@@ -175,7 +175,6 @@ def _run_seeds():
 def startup():
     try:
         from app.database import engine, Base
-        Base.metadata.drop_all(bind=engine)
         Base.metadata.create_all(bind=engine)
         threading.Thread(target=_run_seeds, daemon=True).start()
     except Exception as e:
