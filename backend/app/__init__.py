@@ -10,7 +10,7 @@ from app.limiter import limiter
 app = FastAPI(
     title="AnimalitoPlus API",
     description="Backend de plataforma de lotería de animalitos",
-    version="1.0.2",
+    version="1.0.3",
 )
 
 app.state.limiter = limiter
@@ -43,7 +43,7 @@ app.add_middleware(
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": "1.0.2"}
+    return {"status": "ok", "version": "1.0.3"}
 
 
 @app.middleware("http")
