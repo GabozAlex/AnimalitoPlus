@@ -8,7 +8,13 @@ Jugar _ Juegoactivo_files/
 
 # Environment variables
 .env
+.env.*
 backend/.env
+
+# Generated files
+*.pdf
+*.csv
+!scripts/*.csv
 
 # Virtual environment
 .venv/
