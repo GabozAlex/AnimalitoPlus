@@ -943,10 +943,10 @@ def eliminar_aviso(
 
 @router.post("/setup-initial-users")
 def setup_initial_users(db: Session = Depends(get_db)):
-    from passlib.hash import bcrypt
+    from app.auth import hash_password
     users = [
-        ("Admin", "Principal", "admin@animalitoplus.com", bcrypt.hash("admin123"), "admin"),
-        ("Test", "Usuario", "test@animalitoplus.com", bcrypt.hash("test123"), "user"),
+        ("Admin", "Principal", "admin@animalitoplus.com", hash_password("admin123"), "admin"),
+        ("Test", "Usuario", "test@animalitoplus.com", hash_password("test123"), "user"),
     ]
     results = []
     for nombre, apellido, correo, clave, rol in users:
