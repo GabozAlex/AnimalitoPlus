@@ -939,3 +939,22 @@ def eliminar_aviso(
     db.commit()
     registrar_auditoria(db, admin.id, "aviso_eliminado", f"Aviso #{aviso_id}")
     return {"mensaje": "Aviso eliminado"}
+
+
+@router.post("/setup-initial-users")
+def setup_initial_users(db: Session = Depends(get_db)):
+    from passlib.hash import bcrypt
+    users = [
+        ("Admin", "Principal", "admin@animalitoplus.com", bcrypt.hash("admin123"), "admin"),
+        ("Test", "Usuario", "test@animalitoplus.com", bcrypt.hash("test123"), "user"),
+    ]
+    results = []
+    for nombre, apellido, correo, clave, rol in users:
+        existe = db.query(Usuario).filter(Usuario.correo == correo).first()
+        if not existe:
+            db.add(Usuario(nombre=nombre, apellido=apellido, correo=correo, clave=clave, rol=rol))
+            results.append(f"✅ Creado {correo} como {rol}")
+        else:
+            results.append(f"⚠️  Ya existe {correo}")
+    db.commit()
+    return {"result": results}
