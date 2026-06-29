@@ -365,23 +365,62 @@ async function cargarAvisos() {
 
 async function verTicketModal(apuestaId) {
   try {
-    const res = await apiFetch('/api/apuestas/' + apuestaId + '/ticket');
-    if (!res.ok) throw new Error('Error');
-    const html = await res.text();
+    const [resResumen, resTicket] = await Promise.all([
+      apiFetch('/api/apuestas/' + apuestaId + '/resumen'),
+      apiFetch('/api/apuestas/' + apuestaId + '/ticket'),
+    ]);
+    if (!resResumen.ok || !resTicket.ok) throw new Error('Error');
+    const data = await resResumen.json();
+    const htmlTicket = await resTicket.text();
+
+    const animList = data.detalles.map(d =>
+      `<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:13px;border-bottom:1px solid #eee;">
+        <span>${d.nombre} #${d.animal_id}</span>
+        <span>Bs ${d.monto.toFixed(2)}</span>
+      </div>`
+    ).join('');
+
+    const estadoColores = { pendiente: '#f59e0b', ganada: '#10b981', perdida: '#ef4444' };
+    const estadoBadge = `<span style="display:inline-block;padding:2px 10px;border-radius:50px;font-size:12px;font-weight:700;color:#fff;background:${estadoColores[data.estado] || '#6b7280'}">${({ pendiente: 'Pendiente', ganada: 'Ganada', perdida: 'Perdida' })[data.estado] || data.estado}</span>`;
+
+    const premioHtml = data.premio
+      ? `<div style="text-align:center;padding:8px;margin-top:8px;background:#e8f5e9;border-radius:6px;font-weight:bold;color:#2e7d32;">🎉 ¡GANASTE! Premio: Bs ${data.premio.toFixed(2)}</div>`
+      : '';
+
     Swal.fire({
       icon: 'success',
-      title: '¡Jugada registrada!',
-      html: `<div style="max-height:60vh;overflow:auto;text-align:left;">${html}</div>`,
+      title: '✅ ¡Jugada registrada!',
+      html: `
+        <div style="text-align:left;font-size:14px;">
+          <p style="margin:4px 0;"><strong>Folio:</strong> ${data.folio || 'N/A'}</p>
+          <p style="margin:4px 0;"><strong>Lotería:</strong> ${data.loteria}</p>
+          <p style="margin:4px 0;"><strong>Horario:</strong> ${data.horario}</p>
+          <p style="margin:4px 0;"><strong>Fecha:</strong> ${data.fecha} &nbsp; ${estadoBadge}</p>
+          <hr style="margin:8px 0;">
+          ${animList}
+          <hr style="margin:8px 0;">
+          <div style="display:flex;justify-content:space-between;font-size:16px;">
+            <strong>Total</strong>
+            <strong style="color:var(--primary);">Bs ${data.total.toFixed(2)}</strong>
+          </div>
+          ${premioHtml}
+        </div>
+      `,
       showCancelButton: true,
       confirmButtonText: '<i class="fas fa-print"></i> Imprimir',
       cancelButtonText: 'Cerrar',
-      width: '500px',
+      width: '95%',
       customClass: { confirmButton: 'btn btn-primary', cancelButton: 'btn btn-secondary' },
       buttonsStyling: false,
-      didOpen: () => {
-        const btn = Swal.getConfirmButton();
-        btn.onclick = () => { window.print(); };
-      },
+    }).then((result) => {
+      if (result.isConfirmed) {
+        const win = window.open('', '_blank', 'width=420,height=600');
+        if (!win) { Swal.fire('Bloqueador', 'Permite ventanas emergentes para imprimir', 'warning'); return; }
+        win.document.write(htmlTicket);
+        win.document.close();
+        win.focus();
+        setTimeout(() => win.print(), 300);
+      }
     });
   } catch (e) {
     Swal.fire({ icon: 'success', title: '¡Jugada registrada!', timer: 2000, showConfirmButton: false });

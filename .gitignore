@@ -6,6 +6,10 @@ Jugar _ Juegoactivo_files/
 🎰 LosAnimalitos.Net - Tu Sitio Seguro.html
 🎰 LosAnimalitos.Net - Tu Sitio Seguro_files/
 
+# Environment variables
+.env
+backend/.env
+
 # Virtual environment
 .venv/
 __pycache__/

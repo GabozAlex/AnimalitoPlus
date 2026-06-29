@@ -5,13 +5,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from datetime import date, timedelta, datetime, time as _time
+from decimal import Decimal
 import json
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config, Auditoria, Notificacion, Cupo, AcumuladoCupo, Aviso, Animal
-from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, TransaccionOut, AdminPagoUpdate
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Resultado, Config, Auditoria, Notificacion, Cupo, AcumuladoCupo, Aviso, Animal, Sorteo
+from app.schemas import AdminUsuarioUpdate, ApuestaOut, ReporteOut, ResultadoCreate, ResultadoUpdate, TransaccionOut, AdminPagoUpdate
 from app.auth import require_admin, get_current_user
-from app.config import CASA_DEFAULT
 
 
 
@@ -49,8 +49,9 @@ def actualizar_usuario(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     if data.saldo is not None:
-        diferencia = data.saldo - user.saldo
-        user.saldo = data.saldo
+        nuevo_saldo = Decimal(str(data.saldo))
+        diferencia = nuevo_saldo - user.saldo
+        user.saldo = nuevo_saldo
         db.add(Transaccion(
             usuario_id=user.id,
             tipo="ajuste_admin",
@@ -207,7 +208,19 @@ def ingresar_resultado(
         raise HTTPException(status_code=400, detail="Fecha inválida")
     horario = datetime.strptime(data.horario, "%H:%M").time()
 
+    sorteo = db.query(Sorteo).filter(
+        Sorteo.loteria == data.loteria,
+        Sorteo.fecha == fecha,
+        Sorteo.horario == horario,
+    ).first()
+    if not sorteo:
+        sorteo = Sorteo(loteria=data.loteria, fecha=fecha, horario=horario, estado="pendiente")
+        db.add(sorteo)
+        db.flush()
+    sorteo.estado = "realizado"
+
     resultado = Resultado(
+        sorteo_id=sorteo.id,
         loteria=data.loteria,
         fecha=fecha,
         horario=horario,
@@ -224,10 +237,91 @@ def ingresar_resultado(
     return {"mensaje": "Resultado registrado y apuestas procesadas", "ganadoras": ganadas}
 
 
+@router.put("/resultados/{resultado_id}")
+def editar_resultado(
+    resultado_id: int,
+    data: ResultadoUpdate,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    resultado = db.query(Resultado).filter(Resultado.id == resultado_id).first()
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Resultado no encontrado")
+
+    if not resultado.sorteo_id:
+        sorteo = db.query(Sorteo).filter(
+            Sorteo.loteria == resultado.loteria,
+            Sorteo.fecha == resultado.fecha,
+            Sorteo.horario == resultado.horario,
+        ).first()
+        if not sorteo:
+            sorteo = Sorteo(loteria=resultado.loteria, fecha=resultado.fecha, horario=resultado.horario, estado="pendiente")
+            db.add(sorteo)
+            db.flush()
+        resultado.sorteo_id = sorteo.id
+
+    old_info = f"{resultado.animal_id} #{resultado.numero}"
+    resultado.animal_id = data.animal_id
+    resultado.numero = data.numero
+    db.flush()
+
+    ganadas = procesar_apuestas_por_resultado(db, resultado)
+    db.commit()
+    registrar_auditoria(db, admin.id, "resultado_editado",
+        f"{resultado.loteria} {resultado.horario}: {old_info} → {data.animal_id} #{data.numero} ({ganadas} ganadoras)")
+    return {"mensaje": "Resultado actualizado", "ganadoras": ganadas}
+
+
+@router.delete("/resultados/{resultado_id}")
+def eliminar_resultado(
+    resultado_id: int,
+    admin: Usuario = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    resultado = db.query(Resultado).filter(Resultado.id == resultado_id).first()
+    if not resultado:
+        raise HTTPException(status_code=404, detail="Resultado no encontrado")
+
+    loteria, fecha, horario = resultado.loteria, resultado.fecha, resultado.horario
+    apuestas = (
+        db.query(Apuesta)
+        .filter(
+            Apuesta.loteria == loteria,
+            Apuesta.fecha == fecha,
+            Apuesta.horario == horario,
+            Apuesta.estado.in_(["ganada", "perdida"]),
+        )
+        .all()
+    )
+    revertidas = 0
+    for apuesta in apuestas:
+        if apuesta.estado == "ganada":
+            detalles_ganadores = [d for d in apuesta.detalles if d.animal_id == resultado.animal_id]
+            monto_base = sum(d.monto for d in detalles_ganadores)
+            premio = monto_base * get_multiplicador(db)
+            usuario = db.query(Usuario).filter(Usuario.id == apuesta.usuario_id).first()
+            if usuario:
+                usuario.saldo -= premio
+                db.add(Transaccion(
+                    usuario_id=usuario.id,
+                    tipo="ajuste_admin",
+                    monto=-premio,
+                    descripcion=f"Reversión premio {loteria} {horario.strftime('%H:%M')} (eliminación resultado {resultado_id})",
+                ))
+            revertidas += 1
+        apuesta.estado = "pendiente"
+
+    db.delete(resultado)
+    db.commit()
+    info = f"{loteria} {horario.strftime('%H:%M')} → {resultado.animal_id} ({revertidas} apuestas revertidas)"
+    registrar_auditoria(db, admin.id, "resultado_eliminado", info)
+    return {"mensaje": "Resultado eliminado", "apuestas_revertidas": revertidas}
+
+
 @router.get("/ganadores")
 def listar_ganadores(
     loteria: Optional[str] = None,
-    user: Usuario = Depends(get_current_user),
+    admin: Usuario = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     query = (
@@ -454,7 +548,7 @@ def get_config_casa(
 ):
     cfg = db.query(Config).filter(Config.clave == 'casa').first()
     if not cfg:
-        return CASA_DEFAULT
+        raise HTTPException(status_code=404, detail="Configuración de casa no encontrada")
     return json.loads(cfg.valor)
 
 

@@ -1,22 +1,26 @@
 from decimal import Decimal
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import date, datetime
 
 from app.database import get_db
-from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Cupo, AcumuladoCupo
+from app.models import Usuario, Apuesta, DetalleApuesta, Transaccion, Cupo, AcumuladoCupo, Animal, Resultado
+from app.animales import ANIMALES_HARDCODE
 from app.schemas import ApuestaCreate, ApuestaOut
 from app.auth import get_current_user
 from app.routes.admin import get_multiplicador
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/apuestas", tags=["apuestas"])
 
 
 @router.post("", response_model=ApuestaOut)
+@limiter.limit("30/minute")
 def crear_apuesta(
+    request: Request,
     data: ApuestaCreate,
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -41,6 +45,20 @@ def crear_apuesta(
         horario = datetime.strptime(data.horario, "%H:%M").time()
     except ValueError:
         raise HTTPException(status_code=400, detail="Horario inválido. Use HH:MM")
+
+    # Validar sorteo
+    from app.models import Sorteo as SorteoModel
+    sorteo = db.query(SorteoModel).filter(
+        SorteoModel.loteria == data.loteria,
+        SorteoModel.fecha == date.today(),
+        SorteoModel.horario == horario,
+    ).first()
+    if not sorteo:
+        sorteo = SorteoModel(loteria=data.loteria, fecha=date.today(), horario=horario, estado="pendiente")
+        db.add(sorteo)
+        db.flush()
+    elif sorteo.estado != "pendiente":
+        raise HTTPException(status_code=400, detail=f"El sorteo {data.loteria} {data.horario} está {sorteo.estado}")
 
     # Validar límites de apuesta
     from app.models import Config as ConfigModel
@@ -123,6 +141,7 @@ def crear_apuesta(
     # Crear apuesta
     apuesta = Apuesta(
         usuario_id=user.id,
+        sorteo_id=sorteo.id,
         loteria=data.loteria,
         total=total,
         fecha=date.today(),
@@ -230,6 +249,61 @@ def detalle_apuesta(
     return apuesta
 
 
+@router.get("/{apuesta_id}/resumen")
+def resumen_apuesta(
+    apuesta_id: int,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    apuesta = db.query(Apuesta).filter(Apuesta.id == apuesta_id).first()
+    if not apuesta:
+        raise HTTPException(status_code=404, detail="Apuesta no encontrada")
+    if apuesta.usuario_id != user.id and user.rol != "admin":
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    nombres = {}
+    for a in db.query(Animal).all():
+        nombres[a.id] = a.nombre
+    for a in ANIMALES_HARDCODE:
+        if a["id"] not in nombres:
+            nombres[a["id"]] = a.get("nombre", "")
+
+    mult = get_multiplicador(db)
+    ganadores_ids = None
+    if apuesta.estado == "ganada":
+        resultados = db.query(Resultado).filter(
+            Resultado.loteria == apuesta.loteria,
+            Resultado.fecha == apuesta.fecha,
+            Resultado.horario == apuesta.horario,
+        ).all()
+        ganadores_ids = {r.animal_id for r in resultados if r.animal_id}
+
+    premio_total = Decimal(0)
+    detalles = []
+    for d in apuesta.detalles:
+        es_ganador = ganadores_ids and d.animal_id in ganadores_ids
+        if es_ganador:
+            premio_total += Decimal(str(d.monto)) * mult
+        detalles.append({
+            "animal_id": d.animal_id,
+            "nombre": nombres.get(d.animal_id, d.animal_id),
+            "monto": float(d.monto),
+            "ganador": es_ganador if apuesta.estado == "ganada" else None,
+        })
+
+    return {
+        "id": apuesta.id,
+        "folio": apuesta.folio,
+        "fecha": apuesta.fecha.isoformat(),
+        "horario": apuesta.horario.strftime("%H:%M"),
+        "loteria": apuesta.loteria.replace("_", " ").title(),
+        "total": float(apuesta.total),
+        "estado": apuesta.estado,
+        "detalles": detalles,
+        "premio": float(premio_total) if premio_total > 0 else None,
+    }
+
+
 @router.get("/{apuesta_id}/ticket", response_class=HTMLResponse)
 def ticket_apuesta(
     apuesta_id: int,
@@ -246,34 +320,32 @@ def ticket_apuesta(
     estado_class = {"pendiente": "Pendiente", "ganada": "Ganada", "perdida": "Perdida"}
     estado_txt = estado_class.get(apuesta.estado, apuesta.estado)
 
-    detalles_html = ""
-    nombres = {}
-    from app.models import Animal
-    animales = db.query(Animal).all()
-    for a in animales:
-        nombres[a.id] = a.nombre
+    mult = get_multiplicador(db)
 
-    from app.animales import ANIMALES_HARDCODE
+    nombres = {}
+    for a in db.query(Animal).all():
+        nombres[a.id] = a.nombre
     for a in ANIMALES_HARDCODE:
         if a["id"] not in nombres:
             nombres[a["id"]] = a.get("nombre", "")
 
+    ganadores_ids = None
+    if apuesta.estado == "ganada":
+        resultados = db.query(Resultado).filter(
+            Resultado.loteria == apuesta.loteria,
+            Resultado.fecha == apuesta.fecha,
+            Resultado.horario == apuesta.horario,
+        ).all()
+        ganadores_ids = {r.animal_id for r in resultados if r.animal_id}
+
+    detalles_html = ""
+    premio_total = Decimal(0)
     for d in apuesta.detalles:
         nom = nombres.get(d.animal_id, d.animal_id)
         clase_estado = ""
-        if apuesta.estado in ("ganada", "perdida"):
-            for dr in apuesta.detalles:
-                if dr.animal_id == d.animal_id:
-                    from app.models import Resultado
-                    res = db.query(Resultado).filter(
-                        Resultado.loteria == apuesta.loteria,
-                        Resultado.fecha == apuesta.fecha,
-                        Resultado.horario == apuesta.horario,
-                        Resultado.animal_id == d.animal_id,
-                    ).first()
-                    if res:
-                        clase_estado = "ganador" if apuesta.estado == "ganada" else "perdedor"
-                    break
+        if ganadores_ids and d.animal_id in ganadores_ids:
+            clase_estado = "ganador"
+            premio_total += Decimal(str(d.monto)) * mult
         detalles_html += f"""
         <tr class="{clase_estado}">
             <td>{d.animal_id}</td>
@@ -282,12 +354,10 @@ def ticket_apuesta(
         </tr>"""
 
     premio_html = ""
-    if apuesta.estado == "ganada":
-        from app.routes.admin import procesar_apuestas_por_resultado
-        total_premio = sum(float(d.monto) * 30 for d in apuesta.detalles)
+    if premio_total > 0:
         premio_html = f"""
         <div class="premio">
-            <strong>¡GANASTE!</strong> Premio: Bs {total_premio:.2f}
+            <strong>¡GANASTE!</strong> Premio: Bs {float(premio_total):.2f}
         </div>"""
 
     html = f"""<!DOCTYPE html>

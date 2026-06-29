@@ -1,5 +1,5 @@
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from datetime import date, datetime, time
 import json
@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models import Usuario, Transaccion, Config
 from app.schemas import RecargaCreate, RetiroCreate, TransaccionOut
 from app.auth import get_current_user
-from app.config import CASA_DEFAULT
+from app.limiter import limiter
 
 router = APIRouter(prefix="/api/pagos", tags=["pagos"])
 
@@ -40,7 +40,9 @@ def _validar_horario(db: Session, tipo: str):
 
 
 @router.post("/recarga")
+@limiter.limit("5/minute")
 def solicitar_recarga(
+    request: Request,
     data: RecargaCreate,
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -75,7 +77,9 @@ def solicitar_recarga(
 
 
 @router.post("/retiro")
+@limiter.limit("3/minute")
 def solicitar_retiro(
+    request: Request,
     data: RetiroCreate,
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -149,5 +153,5 @@ def get_config_casa(
 ):
     cfg = db.query(Config).filter(Config.clave == 'casa').first()
     if not cfg:
-        return CASA_DEFAULT
+        raise HTTPException(status_code=404, detail="Configuración de casa no encontrada")
     return json.loads(cfg.valor)

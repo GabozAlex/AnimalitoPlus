@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Resultado
+from app.models import Resultado, Sorteo
 
 logger = logging.getLogger("scraper")
 
@@ -138,7 +138,18 @@ def save_results(db: Session, records: list[dict]) -> int:
             continue
         from datetime import datetime as _dt
         horario_time = _dt.strptime(r["horario"], "%H:%M:%S").time()
+        sorteo = db.query(Sorteo).filter(
+            Sorteo.loteria == r["loteria"],
+            Sorteo.fecha == r["fecha"],
+            Sorteo.horario == horario_time,
+        ).first()
+        if not sorteo:
+            sorteo = Sorteo(loteria=r["loteria"], fecha=r["fecha"], horario=horario_time, estado="pendiente")
+            db.add(sorteo)
+            db.flush()
+        sorteo.estado = "realizado"
         db.add(Resultado(
+            sorteo_id=sorteo.id,
             fecha=r["fecha"],
             loteria=r["loteria"],
             horario=horario_time,

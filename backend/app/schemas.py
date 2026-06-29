@@ -177,6 +177,11 @@ class ResultadoCreate(BaseModel):
     numero: str
 
 
+class ResultadoUpdate(BaseModel):
+    animal_id: str
+    numero: str
+
+
 # ===== ESQUEMAS DE PAGO =====
 
 class RecargaCreate(BaseModel):
@@ -235,6 +240,28 @@ class ResultadosResponse(BaseModel):
     source: str  # "db" | "scraped"
     count: int
     resultados: List[ResultadoOut]
+
+
+class SorteoGenerar(BaseModel):
+    fecha_desde: Optional[str] = None
+    fecha_hasta: Optional[str] = None
+
+
+class SorteoOut(BaseModel):
+    id: int
+    loteria: str
+    fecha: str
+    horario: str
+    estado: str
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class SorteoList(BaseModel):
+    count: int
+    sorteos: List[SorteoOut]
 
 
 class ReporteOut(BaseModel):

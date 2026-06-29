@@ -1,4 +1,5 @@
 import json, traceback
+from sqlalchemy import text
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.cron import CronTrigger
@@ -14,6 +15,8 @@ def job_scraper():
 
     db = SessionLocal()
     try:
+        db.execute(text("SELECT pg_advisory_xact_lock(42)"))
+        
         results = run_scraper_parallel(None, db)
         total_ganadas = 0
         for loteria in results.get("loterias", {}):
@@ -36,21 +39,6 @@ def job_scraper():
             descripcion=f"Error: {traceback.format_exc()[:500]}",
         ))
         db.commit()
-    finally:
-        db.close()
-
-
-def job_instagram_avisos():
-    from app.database import SessionLocal
-    from app.instagram_scraper import scrape_avisos_instagram
-
-    db = SessionLocal()
-    try:
-        resultados = scrape_avisos_instagram(db)
-        if resultados:
-            print(f"[instagram] {len(resultados)} avisos nuevos")
-    except Exception:
-        print(f"[instagram] Error: {traceback.format_exc()[:300]}")
     finally:
         db.close()
 
@@ -93,12 +81,6 @@ def start_scheduler():
         job_scraper,
         IntervalTrigger(minutes=intervalo),
         id="scraper_auto",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        job_instagram_avisos,
-        IntervalTrigger(minutes=intervalo),
-        id="instagram_avisos",
         replace_existing=True,
     )
     scheduler.add_job(

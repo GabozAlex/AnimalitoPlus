@@ -4,7 +4,7 @@ from datetime import date, datetime
 from typing import Optional
 
 from app.database import get_db
-from app.models import Resultado, Usuario
+from app.models import Resultado, Usuario, Sorteo
 from app.schemas import ResultadoOut, ResultadoCreate, ResultadosResponse
 from app.auth import get_current_user, require_admin
 
@@ -56,7 +56,19 @@ def crear_resultado(
         raise HTTPException(status_code=400, detail="Fecha inválida")
     horario = datetime.strptime(data.horario, "%H:%M").time()
 
+    sorteo = db.query(Sorteo).filter(
+        Sorteo.loteria == data.loteria,
+        Sorteo.fecha == target_date,
+        Sorteo.horario == horario,
+    ).first()
+    if not sorteo:
+        sorteo = Sorteo(loteria=data.loteria, fecha=target_date, horario=horario, estado="pendiente")
+        db.add(sorteo)
+        db.flush()
+    sorteo.estado = "realizado"
+
     resultado = Resultado(
+        sorteo_id=sorteo.id,
         loteria=data.loteria,
         fecha=target_date,
         horario=horario,

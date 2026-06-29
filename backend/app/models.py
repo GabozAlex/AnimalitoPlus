@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Time, Date, Text, Enum as SAEnum, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Time, Date, Text, Enum as SAEnum, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime, date, time
 import enum
@@ -63,6 +63,7 @@ class Apuesta(Base):
     id = Column(Integer, primary_key=True, index=True)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
     loteria = Column(String(50), nullable=False)
+    sorteo_id = Column(Integer, ForeignKey("sorteos.id"), nullable=True)
     total = Column(Numeric(12, 2), nullable=False)
     fecha = Column(Date, default=date.today, nullable=False)
     horario = Column(Time, nullable=False)
@@ -72,6 +73,7 @@ class Apuesta(Base):
 
     usuario = relationship("Usuario", back_populates="apuestas")
     detalles = relationship("DetalleApuesta", back_populates="apuesta")
+    sorteo = relationship("Sorteo", back_populates="apuestas")
 
 
 class DetalleApuesta(Base):
@@ -90,11 +92,14 @@ class Resultado(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     loteria = Column(String(50), nullable=False)
+    sorteo_id = Column(Integer, ForeignKey("sorteos.id"), nullable=True)
     fecha = Column(Date, default=date.today, nullable=False)
     horario = Column(Time, nullable=False)
     animal_id = Column(String(3), nullable=False)
     numero = Column(String(2), nullable=False)
     created_at = Column(DateTime, default=datetime.now)
+
+    sorteo = relationship("Sorteo", back_populates="resultados")
 
 
 class Transaccion(Base):
@@ -132,6 +137,28 @@ class AcumuladoCupo(Base):
     horario = Column(Time, primary_key=True)
     animal_id = Column(String(3), primary_key=True)
     acumulado = Column(Numeric(12, 2), nullable=False, default=0)
+
+
+class EstadoSorteoEnum(str, enum.Enum):
+    pendiente = "pendiente"
+    realizado = "realizado"
+    cancelado = "cancelado"
+
+
+class Sorteo(Base):
+    __tablename__ = "sorteos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    loteria = Column(String(50), nullable=False)
+    fecha = Column(Date, nullable=False)
+    horario = Column(Time, nullable=False)
+    estado = Column(String(20), default="pendiente")
+    created_at = Column(DateTime, default=datetime.now)
+
+    __table_args__ = (UniqueConstraint("loteria", "fecha", "horario", name="uq_sorteo"),)
+
+    apuestas = relationship("Apuesta", back_populates="sorteo")
+    resultados = relationship("Resultado", back_populates="sorteo")
 
 
 class Animal(Base):

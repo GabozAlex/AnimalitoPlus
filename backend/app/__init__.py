@@ -29,7 +29,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 import os
 
-_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:8000,https://animalito-plus.vercel.app,https://animalitoplus-production.up.railway.app"
+_DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:8000,https://animalito-plus.vercel.app,https://animalitoplus-api.onrender.com"
 ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
 
 app.add_middleware(
@@ -45,7 +45,17 @@ def health():
     return {"status": "ok", "version": "1.0.0"}
 
 
-from app.routes import auth, apuestas, resultados, pagos, admin, avisos, animales, notificaciones
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+
+from app.routes import auth, apuestas, resultados, pagos, admin, avisos, animales, notificaciones, sorteos
 app.include_router(auth.router)
 app.include_router(apuestas.router)
 app.include_router(resultados.router)
@@ -54,6 +64,7 @@ app.include_router(admin.router)
 app.include_router(avisos.router)
 app.include_router(animales.router)
 app.include_router(notificaciones.router)
+app.include_router(sorteos.router)
 
 from app.scheduler import start_scheduler
 

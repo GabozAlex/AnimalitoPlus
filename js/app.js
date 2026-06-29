@@ -1,6 +1,6 @@
 const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')
   ? `http://${window.location.hostname}:8000`
-  : 'https://animalitoplus-production.up.railway.app';
+  : 'https://animalitoplus-api.onrender.com';
 
 const TOKEN_KEY = 'animalito_token';
 const USER_KEY = 'animalito_user';
@@ -493,6 +493,8 @@ async function showWithdrawModal() {
     }
   });
 }
+
+window.addEventListener('unhandledrejection', e => { console.warn('[unhandled]', e.reason); });
 
 document.addEventListener('DOMContentLoaded', () => {
   const page = window.location.pathname.split('/').pop() || 'index.html';

@@ -47,6 +47,7 @@
     <a href="#" onclick="showSection('usuarios', event)"><i class="fas fa-users"></i> Usuarios</a>
     <a href="#" onclick="showSection('apuestas', event)"><i class="fas fa-ticket"></i> Apuestas</a>
     <a href="#" onclick="showSection('resultados', event)"><i class="fas fa-list"></i> Resultados</a>
+    <a href="#" onclick="showSection('sorteos', event)"><i class="fas fa-calendar"></i> Sorteos</a>
     <a href="#" onclick="showSection('recargas', event)"><i class="fas fa-plus-circle"></i> Recargas</a>
     <a href="#" onclick="showSection('retiros', event)"><i class="fas fa-money-bill-wave"></i> Retiros</a>
     <a href="#" onclick="showSection('reportes', event)"><i class="fas fa-file-invoice"></i> Reportes</a>
@@ -163,12 +164,32 @@
           </div>
         </form>
       </div>
-      <h6 class="fw-bold mb-2">Resultados de hoy</h6>
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <h6 class="fw-bold mb-0">Resultados</h6>
+        <input type="date" class="form-control form-control-sm w-auto" id="filtroFechaResultados" onchange="cargarResultadosAdmin()">
+      </div>
       <div class="stat-card p-0">
         <div class="table-responsive">
           <table class="table table-admin table-hover mb-0">
-            <thead><tr><th>Loteria</th><th>Horario</th><th>Animal</th><th>Número</th></tr></thead>
+            <thead><tr><th>Loteria</th><th>Horario</th><th>Animal</th><th>Número</th><th></th></tr></thead>
             <tbody id="resultadosTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION: SORTEOS -->
+    <div id="sec-sorteos" class="section-admin d-none">
+      <h5 class="fw-bold mb-3"><i class="fas fa-calendar me-1 text-primary"></i> Sorteos</h5>
+      <div class="d-flex gap-2 mb-3">
+        <input type="date" class="form-control form-control-sm w-auto" id="filtroSorteosFecha" onchange="cargarSorteos()" value="">
+        <button class="btn btn-sm btn-gold" onclick="generarSorteos()"><i class="fas fa-plus me-1"></i> Generar próxima semana</button>
+      </div>
+      <div class="stat-card p-0">
+        <div class="table-responsive">
+          <table class="table table-admin table-hover mb-0">
+            <thead><tr><th>Lotería</th><th>Horario</th><th>Fecha</th><th>Estado</th><th>Acción</th></tr></thead>
+            <tbody id="sorteosTable"></tbody>
           </table>
         </div>
       </div>
@@ -446,8 +467,8 @@
   <script src="js/app.js"></script>
   <script>
     const API = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname === '0.0.0.0')
-      ? 'http://localhost:8000'
-      : 'https://animalitoplus-production.up.railway.app';
+      ? `http://${window.location.hostname}:8000`
+      : 'https://animalitoplus-api.onrender.com';
 
     document.addEventListener('DOMContentLoaded', async () => {
       const token = getToken();
@@ -482,11 +503,12 @@
       if (target) target.classList.remove('d-none');
       document.querySelectorAll('.sidebar a').forEach(a => a.classList.remove('active'));
       if (event) event.target.closest('a').classList.add('active');
-      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración', referidos: 'Referidos', auditoria: 'Auditoría', avisos: 'Avisos', cupos: 'Cupos', animales: 'Animales' };
+      const titles = { dashboard: 'Dashboard', usuarios: 'Usuarios', apuestas: 'Apuestas', resultados: 'Resultados', sorteos: 'Sorteos', recargas: 'Recargas', retiros: 'Retiros', reportes: 'Reportes', config: 'Configuración', referidos: 'Referidos', auditoria: 'Auditoría', avisos: 'Avisos', cupos: 'Cupos', animales: 'Animales' };
       document.getElementById('sectionTitle').textContent = titles[name] || name;
       if (name === 'usuarios') cargarUsuarios();
       if (name === 'apuestas') cargarApuestasAdmin();
       if (name === 'resultados') cargarResultadosAdmin();
+      if (name === 'sorteos') cargarSorteos();
       if (name === 'recargas') cargarRecargas();
       if (name === 'retiros') cargarRetiros();
       if (name === 'reportes') cargarReportes();
@@ -580,12 +602,17 @@
         showCancelButton: true, confirmButtonText: 'Guardar',
       });
       if (value !== null && value !== undefined) {
-        await fetch(`${API}/api/admin/usuarios/${id}`, {
-          method: 'PUT', headers: getHeaders(),
-          body: JSON.stringify({ saldo: parseFloat(value) })
-        });
-        cargarUsuarios();
-        Swal.fire('Listo', 'Saldo actualizado', 'success');
+        try {
+          const res = await fetch(`${API}/api/admin/usuarios/${id}`, {
+            method: 'PUT', headers: getHeaders(),
+            body: JSON.stringify({ saldo: parseFloat(value) })
+          });
+          if (!res.ok) throw new Error(await res.text());
+          cargarUsuarios();
+          Swal.fire('Listo', 'Saldo actualizado', 'success');
+        } catch(e) {
+          Swal.fire('Error', e.message || 'No se pudo actualizar el saldo', 'error');
+        }
       }
     }
 
@@ -636,16 +663,157 @@
     }
 
     async function cargarResultadosAdmin() {
+      const fechaInput = document.getElementById('filtroFechaResultados');
+      if (!fechaInput.value) fechaInput.value = new Date().toISOString().split('T')[0];
       try {
-        const res = await fetch(`${API}/api/resultados`, { headers: getHeaders() });
+        const res = await fetch(`${API}/api/resultados?fecha=${fechaInput.value}`, { headers: getHeaders() });
+        if (!res.ok) return;
         const data = await res.json();
         const resultados = data.resultados || data;
         const tbody = document.getElementById('resultadosTable');
         tbody.innerHTML = resultados.map(r => {
           const animal = ANIMALES.find(a => a.id == r.animal_id);
-          return `<tr><td>${r.loteria}</td><td>${r.horario}</td><td>${animal ? animal.nombre : r.animal_id}</td><td class="fw-bold">${r.numero}</td></tr>`;
+          return `<tr>
+            <td>${r.loteria}</td>
+            <td>${r.horario}</td>
+            <td>${animal ? animal.nombre : r.animal_id}</td>
+            <td class="fw-bold">${r.numero}</td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-primary py-0 me-1" onclick="editarResultado(${r.id}, '${r.loteria}', '${r.horario}', '${r.animal_id}', '${r.numero}')"><i class="fas fa-edit"></i></button>
+              <button class="btn btn-sm btn-outline-danger py-0" onclick="eliminarResultado(${r.id})"><i class="fas fa-trash-alt"></i></button>
+            </td>
+          </tr>`;
         }).join('');
       } catch(e) { console.error(e); }
+    }
+
+    async function editarResultado(id, loteria, horario, animalId, numero) {
+      const opts = ANIMALES.map(a =>
+        `<option value="${a.id}" ${a.id === animalId ? 'selected' : ''}>${a.numero} - ${a.nombre}</option>`
+      ).join('');
+      const { value: form } = await Swal.fire({
+        title: `Editar resultado ${loteria} ${horario}`,
+        html: `
+          <div style="text-align:left;">
+            <label class="form-label">Animal</label>
+            <select id="swal-animal" class="form-select">${opts}</select>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => document.getElementById('swal-animal').value,
+      });
+      if (!form) return;
+      const nuevoAnimal = ANIMALES.find(a => a.id === form);
+      try {
+        const res = await fetch(`${API}/api/admin/resultados/${id}`, {
+          method: 'PUT', headers: getHeaders(),
+          body: JSON.stringify({ animal_id: form, numero: nuevoAnimal?.numero || '00' }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        Swal.fire('Actualizado', `Resultado ${loteria} ${horario}: ${nuevoAnimal?.nombre || form}. Ganadoras: ${result.ganadoras || 0}`, 'success');
+        cargarResultadosAdmin();
+      } catch(e) {
+        Swal.fire('Error', e.message || 'No se pudo actualizar', 'error');
+      }
+    }
+
+    async function eliminarResultado(id) {
+      const { isConfirmed } = await Swal.fire({
+        title: '¿Eliminar resultado?',
+        text: 'Las apuestas asociadas se revertirán a pendiente y los premios se descontarán.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar',
+      });
+      if (!isConfirmed) return;
+      try {
+        const res = await fetch(`${API}/api/admin/resultados/${id}`, {
+          method: 'DELETE', headers: getHeaders(),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        Swal.fire('Eliminado', `Resultado eliminado. ${result.apuestas_revertidas} apuestas revertidas.`, 'success');
+        cargarResultadosAdmin();
+      } catch(e) {
+        Swal.fire('Error', e.message || 'No se pudo eliminar', 'error');
+      }
+    }
+
+    async function cargarSorteos() {
+      const fi = document.getElementById('filtroSorteosFecha');
+      if (!fi.value) fi.value = new Date().toISOString().split('T')[0];
+      try {
+        const res = await fetch(`${API}/api/sorteos?fecha=${fi.value}`, { headers: getHeaders() });
+        if (!res.ok) return;
+        const data = await res.json();
+        const tbody = document.getElementById('sorteosTable');
+        const ESTILO = { pendiente: 'warning', realizado: 'success', cancelado: 'secondary' };
+        tbody.innerHTML = (data.sorteos || []).map(s => `
+          <tr>
+            <td>${({ lotto_activo: 'Lotto Activo', la_granjita: 'La Granjita', selvaplus: 'SelvaPlus' })[s.loteria] || s.loteria}</td>
+            <td>${s.horario}</td>
+            <td>${s.fecha}</td>
+            <td><span class="badge bg-${ESTILO[s.estado] || 'secondary'}">${s.estado}</span></td>
+            <td>${s.estado === 'pendiente'
+              ? `<button class="btn btn-sm btn-outline-danger py-0" onclick="cancelarSorteo(${s.id})"><i class="fas fa-ban"></i> Cancelar</button>`
+              : '<span class="text-muted" style="font-size:12px;">—</span>'
+            }</td>
+          </tr>
+        `).join('');
+      } catch(e) { console.error(e); }
+    }
+
+    async function generarSorteos() {
+      const { isConfirmed } = await Swal.fire({
+        title: '¿Generar sorteos?',
+        text: 'Se crearán sorteos pendientes para los próximos 7 días según el schedule de cada lotería.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, generar',
+        cancelButtonText: 'Cancelar',
+      });
+      if (!isConfirmed) return;
+      try {
+        const res = await fetch(`${API}/api/sorteos/generar`, {
+          method: 'POST', headers: getHeaders(),
+          body: JSON.stringify({}),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        Swal.fire('Listo', result.mensaje + ` (${result.creados} creados)`, 'success');
+        cargarSorteos();
+      } catch(e) {
+        Swal.fire('Error', e.message || 'No se pudieron generar', 'error');
+      }
+    }
+
+    async function cancelarSorteo(id) {
+      const { isConfirmed } = await Swal.fire({
+        title: '¿Cancelar sorteo?',
+        text: 'Las apuestas pendientes se reembolsarán a los usuarios.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        confirmButtonText: 'Sí, cancelar',
+        cancelButtonText: 'No',
+      });
+      if (!isConfirmed) return;
+      try {
+        const res = await fetch(`${API}/api/sorteos/${id}/cancelar`, {
+          method: 'POST', headers: getHeaders(),
+        });
+        if (!res.ok) throw new Error(await res.text());
+        const result = await res.json();
+        Swal.fire('Cancelado', result.mensaje + ` (${result.apuestas_reembolsadas} reembolsos)`, 'success');
+        cargarSorteos();
+      } catch(e) {
+        Swal.fire('Error', e.message || 'No se pudo cancelar', 'error');
+      }
     }
 
     async function cargarReportes() {
