@@ -28,6 +28,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 import os
+import threading
 
 _DEFAULT_ORIGINS = "http://localhost:5173,http://localhost:3000,http://localhost:8000,http://127.0.0.1:5173,http://127.0.0.1:3000,http://127.0.0.1:8000,https://animalito-plus.vercel.app,https://animalitoplus-api.onrender.com"
 ALLOWED_ORIGINS = os.environ.get("CORS_ORIGINS", _DEFAULT_ORIGINS).split(",")
@@ -159,15 +160,23 @@ def seed_initial_users():
         db.close()
 
 
+def _run_seeds():
+    try:
+        seed_config_defaults()
+        seed_animales()
+        seed_initial_users()
+        start_scheduler()
+    except Exception as e:
+        traceback.print_exc()
+        print(f"[seeds] Error: {e}")
+
+
 @app.on_event("startup")
 def startup():
     try:
         from app.database import engine, Base
         Base.metadata.create_all(bind=engine)
-        seed_config_defaults()
-        seed_animales()
-        seed_initial_users()
-        start_scheduler()
+        threading.Thread(target=_run_seeds, daemon=True).start()
     except Exception as e:
         traceback.print_exc()
         print(f"[startup] Error: {e}")
