@@ -10,7 +10,7 @@ from app.limiter import limiter
 app = FastAPI(
     title="AnimalitoPlus API",
     description="Backend de plataforma de lotería de animalitos",
-    version="1.0.0",
+    version="1.0.1",
 )
 
 app.state.limiter = limiter
